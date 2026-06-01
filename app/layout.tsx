@@ -41,7 +41,10 @@ export default function RootLayout({
       )}
     >
       <body>
-        <ClerkProvider localization={deDE}>
+        <ClerkProvider
+          localization={deDE}
+          publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!}
+        >
           <ConvexClientProvider>
             <ThemeProvider>{children}</ThemeProvider>
           </ConvexClientProvider>
