@@ -99,7 +99,11 @@ const colorSchemes: {
 }[] = [
   { value: "civic", label: "Bürgerlich", swatches: ["#334155", "#f59e0b"] },
   { value: "forest", label: "Wald", swatches: ["#166534", "#84cc16"] },
-  { value: "sunset", label: "Sonnenuntergang", swatches: ["#be123c", "#f97316"] },
+  {
+    value: "sunset",
+    label: "Sonnenuntergang",
+    swatches: ["#be123c", "#f97316"],
+  },
   { value: "mono", label: "Mono", swatches: ["#18181b", "#a1a1aa"] },
 ]
 
@@ -136,7 +140,9 @@ function reorderQuestionList(
   questionId: Id<"questions">,
   targetIndex: number
 ) {
-  const fromIndex = questions.findIndex((question) => question._id === questionId)
+  const fromIndex = questions.findIndex(
+    (question) => question._id === questionId
+  )
   if (fromIndex < 0) return questions
 
   const nextQuestions = [...questions]
@@ -186,7 +192,9 @@ function QuestionDragPreview({
         </span>
       </div>
       <div className="min-w-0">
-        <h2 className="leading-6 font-medium">{question.title || question.text}</h2>
+        <h2 className="leading-6 font-medium">
+          {question.title || question.text}
+        </h2>
         <p className="mt-1 text-sm leading-6">{question.text}</p>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           {question.context || "Kein Kontext hinzugefügt."}
@@ -1065,7 +1073,7 @@ function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
         <tbody>
           {editor.questions.map((question) => (
             <tr key={question._id} className="border-b align-top last:border-0">
-              <td className="p-3">
+              <td className="min-w-64 p-3">
                 <div className="font-medium">
                   {question.title || question.text}
                 </div>
@@ -1076,12 +1084,10 @@ function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
               </td>
               {editor.parties.map((party) => {
                 const positionKey = `${party._id}:${question._id}`
-                const position = positionByKey.get(
-                  positionKey
-                )
+                const position = positionByKey.get(positionKey)
                 const explanation = getExplanationDraft(positionKey, position)
                 return (
-                  <td key={party._id} className="p-3">
+                  <td key={party._id} className="min-w-56 p-3">
                     <div className="grid grid-cols-3 border">
                       {stanceOptions.map((option) => (
                         <button
@@ -1293,7 +1299,9 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
             <div className="flex flex-col justify-center gap-3">
               <label className="inline-flex h-10 w-fit items-center justify-center gap-1.5 border border-border px-4 text-xs font-semibold tracking-widest whitespace-nowrap uppercase transition hover:bg-muted">
                 <Upload className="size-3.5" />
-                {isUploadingBackground ? "Wird hochgeladen" : "Hintergrund hochladen"}
+                {isUploadingBackground
+                  ? "Wird hochgeladen"
+                  : "Hintergrund hochladen"}
                 <input
                   className="sr-only"
                   type="file"
@@ -1330,7 +1338,9 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
           </div>
           <label className="flex items-center justify-between gap-4">
             <span>
-              <span className="block text-sm font-medium">Öffentlicher Zugriff</span>
+              <span className="block text-sm font-medium">
+                Öffentlicher Zugriff
+              </span>
               <span className="mt-1 block text-xs text-muted-foreground">
                 Ermöglicht das Kopieren und Anzeigen des öffentlichen O-Mats.
               </span>
