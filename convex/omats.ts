@@ -8,6 +8,8 @@ import {
 import { type Id } from "./_generated/dataModel"
 
 const colors = ["#0f766e", "#b91c1c", "#4338ca", "#a16207", "#be185d"]
+const personalWorkspacePrefix = "personal:"
+const organizationWorkspacePrefix = "org:"
 
 const colorSchemeValidator = v.union(
   v.literal("civic"),
@@ -24,6 +26,91 @@ async function requireIdentity(ctx: QueryCtx | MutationCtx) {
   return identity
 }
 
+function getActiveOrganizationClaim(
+  identity: Awaited<ReturnType<typeof requireIdentity>>
+) {
+  const orgId = identity.org_id
+  return typeof orgId === "string" ? orgId : null
+}
+
+function getWorkspaceId(
+  identity: Awaited<ReturnType<typeof requireIdentity>>,
+  clerkOrganizationId: string | null
+) {
+  if (!clerkOrganizationId) {
+    return {
+      clerkWorkspaceId: `${personalWorkspacePrefix}${identity.tokenIdentifier}`,
+      clerkOrganizationId: undefined,
+    }
+  }
+
+  const activeOrganizationId = getActiveOrganizationClaim(identity)
+  if (activeOrganizationId !== clerkOrganizationId) {
+    throw new Error(
+      "Die aktive Clerk-Organisation fehlt im Convex-JWT. Ergänze im Clerk-JWT-Template convex den Claim org_id mit {{org.id}}."
+    )
+  }
+
+  return {
+    clerkWorkspaceId: `${organizationWorkspacePrefix}${clerkOrganizationId}`,
+    clerkOrganizationId,
+  }
+}
+
+async function getOrganizationByWorkspaceId(
+  ctx: QueryCtx | MutationCtx,
+  clerkWorkspaceId: string
+) {
+  return await ctx.db
+    .query("organizations")
+    .withIndex("by_clerkWorkspaceId", (q) =>
+      q.eq("clerkWorkspaceId", clerkWorkspaceId)
+    )
+    .unique()
+}
+
+async function ensureOrganizationForWorkspace(
+  ctx: MutationCtx,
+  args: {
+    clerkOrganizationId: string | null
+    name: string
+    description: string
+  }
+) {
+  const identity = await requireIdentity(ctx)
+  const workspace = getWorkspaceId(identity, args.clerkOrganizationId)
+  const existing = await getOrganizationByWorkspaceId(
+    ctx,
+    workspace.clerkWorkspaceId
+  )
+  const name = args.name.trim() || "Personal workspace"
+  const description = args.description.trim()
+
+  if (existing) {
+    await ctx.db.patch(existing._id, {
+      name,
+      description,
+      clerkOrganizationId: workspace.clerkOrganizationId,
+      ownerTokenIdentifier: identity.tokenIdentifier,
+    })
+    return existing
+  }
+
+  const organizationId = await ctx.db.insert("organizations", {
+    name,
+    description,
+    clerkWorkspaceId: workspace.clerkWorkspaceId,
+    clerkOrganizationId: workspace.clerkOrganizationId,
+    ownerTokenIdentifier: identity.tokenIdentifier,
+    createdAt: Date.now(),
+  })
+  const organization = await ctx.db.get(organizationId)
+  if (!organization) {
+    throw new Error("Organisation konnte nicht erstellt werden")
+  }
+  return organization
+}
+
 async function requireOrganizationAccess(
   ctx: QueryCtx | MutationCtx,
   organizationId: Id<"organizations">
@@ -33,7 +120,19 @@ async function requireOrganizationAccess(
   if (!organization) {
     throw new Error("Organisation nicht gefunden")
   }
-  if (organization.ownerTokenIdentifier !== identity.tokenIdentifier) {
+  if (organization.clerkOrganizationId) {
+    if (
+      getActiveOrganizationClaim(identity) !== organization.clerkOrganizationId
+    ) {
+      throw new Error("Nicht autorisiert")
+    }
+    return organization
+  }
+  if (
+    organization.ownerTokenIdentifier !== identity.tokenIdentifier &&
+    organization.clerkWorkspaceId !==
+      `${personalWorkspacePrefix}${identity.tokenIdentifier}`
+  ) {
     throw new Error("Nicht autorisiert")
   }
   return organization
@@ -112,72 +211,58 @@ export const generateUploadUrl = mutation({
 })
 
 export const listDashboard = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    clerkOrganizationId: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx)
-    const organizations = await ctx.db
-      .query("organizations")
-      .withIndex("by_ownerTokenIdentifier", (q) =>
-        q.eq("ownerTokenIdentifier", identity.tokenIdentifier)
-      )
-      .collect()
-
-    const rows = []
-    for (const organization of organizations) {
-      const omats = await ctx.db
-        .query("omats")
-        .withIndex("by_organizationId", (q) =>
-          q.eq("organizationId", organization._id)
-        )
-        .collect()
-      rows.push({ organization, omats })
+    const workspace = getWorkspaceId(identity, args.clerkOrganizationId)
+    const organization = await getOrganizationByWorkspaceId(
+      ctx,
+      workspace.clerkWorkspaceId
+    )
+    if (!organization) {
+      return null
     }
-    return rows
+    const omats = await ctx.db
+      .query("omats")
+      .withIndex("by_organizationId", (q) =>
+        q.eq("organizationId", organization._id)
+      )
+      .order("desc")
+      .take(50)
+    return { organization, omats }
   },
 })
 
-export const createOrganization = mutation({
+export const ensureActiveOrganization = mutation({
   args: {
+    clerkOrganizationId: v.union(v.string(), v.null()),
     name: v.string(),
     description: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await requireIdentity(ctx)
-    return await ctx.db.insert("organizations", {
-      name: args.name.trim(),
-      description: args.description.trim(),
-      ownerTokenIdentifier: identity.tokenIdentifier,
-      createdAt: Date.now(),
-    })
-  },
-})
-
-export const updateOrganization = mutation({
-  args: {
-    organizationId: v.id("organizations"),
-    name: v.string(),
-    description: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await requireOrganizationAccess(ctx, args.organizationId)
-    await ctx.db.patch(args.organizationId, {
-      name: args.name.trim(),
-      description: args.description.trim(),
-    })
+    return await ensureOrganizationForWorkspace(ctx, args)
   },
 })
 
 export const createOmat = mutation({
   args: {
-    organizationId: v.id("organizations"),
+    clerkOrganizationId: v.union(v.string(), v.null()),
+    organizationName: v.string(),
+    organizationDescription: v.string(),
     title: v.string(),
     description: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireOrganizationAccess(ctx, args.organizationId)
+    const organization = await ensureOrganizationForWorkspace(ctx, {
+      clerkOrganizationId: args.clerkOrganizationId,
+      name: args.organizationName,
+      description: args.organizationDescription,
+    })
     const now = Date.now()
     const omatId = await ctx.db.insert("omats", {
-      organizationId: args.organizationId,
+      organizationId: organization._id,
       title: args.title.trim(),
       slug: `${slugify(args.title)}-${now.toString(36)}`,
       description: args.description.trim(),
@@ -280,27 +365,6 @@ export const deleteOmat = mutation({
   handler: async (ctx, args) => {
     await requireOmatAccess(ctx, args.omatId)
     await deleteOmatDocuments(ctx, args.omatId)
-  },
-})
-
-export const deleteOrganization = mutation({
-  args: {
-    organizationId: v.id("organizations"),
-  },
-  handler: async (ctx, args) => {
-    await requireOrganizationAccess(ctx, args.organizationId)
-    const omats = await ctx.db
-      .query("omats")
-      .withIndex("by_organizationId", (q) =>
-        q.eq("organizationId", args.organizationId)
-      )
-      .collect()
-
-    for (const omat of omats) {
-      await deleteOmatDocuments(ctx, omat._id)
-    }
-
-    await ctx.db.delete(args.organizationId)
   },
 })
 
@@ -489,7 +553,7 @@ export const updateQuestion = mutation({
   handler: async (ctx, args) => {
     const question = await ctx.db.get(args.questionId)
     if (!question) {
-        throw new Error("These nicht gefunden")
+      throw new Error("These nicht gefunden")
     }
     await requireOmatAccess(ctx, question.omatId)
     await ctx.db.patch(args.questionId, {

@@ -5,9 +5,13 @@ export default defineSchema({
   organizations: defineTable({
     name: v.string(),
     description: v.string(),
+    clerkWorkspaceId: v.optional(v.string()),
+    clerkOrganizationId: v.optional(v.string()),
     ownerTokenIdentifier: v.string(),
     createdAt: v.number(),
-  }).index("by_ownerTokenIdentifier", ["ownerTokenIdentifier"]),
+  })
+    .index("by_ownerTokenIdentifier", ["ownerTokenIdentifier"])
+    .index("by_clerkWorkspaceId", ["clerkWorkspaceId"]),
 
   omats: defineTable({
     organizationId: v.id("organizations"),

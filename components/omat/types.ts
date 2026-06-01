@@ -8,7 +8,8 @@ export type AnswerState = Record<
 >
 
 export type DashboardData =
-  | { organization: Doc<"organizations">; omats: Doc<"omats">[] }[]
+  | { organization: Doc<"organizations">; omats: Doc<"omats">[] }
+  | null
   | undefined
 
 export type RunnerData =
