@@ -153,7 +153,7 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
   return (
     <section
       className={cn(
-        "relative isolate min-h-svh bg-cover bg-center px-4 py-24 md:px-8",
+        "omat-runner-shell relative isolate min-h-svh overflow-hidden bg-cover bg-center px-4 py-24 md:px-8",
         data.omat.backgroundUrl &&
           "before:pointer-events-none before:absolute before:inset-0 before:z-0 before:bg-background/80"
       )}
@@ -163,7 +163,13 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
           : undefined
       }
     >
-      <div className="absolute top-4 left-4 z-10 max-w-[calc(100vw-2rem)] md:top-6 md:left-8 md:max-w-xs">
+      <div className="omat-runner-streams" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+
+      <div className="omat-runner-brand absolute top-4 left-4 z-10 max-w-[calc(100vw-2rem)] md:top-6 md:left-8 md:max-w-xs">
         <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
           Live-O-Mat
         </p>
@@ -173,8 +179,11 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
       </div>
 
       {stage === "answering" && currentQuestion ? (
-        <div className="relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-3xl items-center">
-          <div className="w-full border bg-card">
+        <div
+          key="answering"
+          className="omat-runner-stage relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-3xl items-center"
+        >
+          <div className="omat-runner-card w-full border bg-card">
             <div className="border-b p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
@@ -194,11 +203,14 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
                   Zurücksetzen
                 </Button>
               </div>
-              <Progress value={progress} />
+              <Progress className="omat-progress" value={progress} />
             </div>
 
             <div className="p-5">
-              <div className="mb-5 flex items-start gap-3">
+              <div
+                key={currentQuestion._id}
+                className="omat-question-block mb-5 flex items-start gap-3"
+              >
                 <span className="flex size-9 shrink-0 items-center justify-center border font-mono text-xs">
                   {currentQuestionIndex + 1}
                 </span>
@@ -219,9 +231,9 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
                     <button
                       key={option.value}
                       className={cn(
-                        "flex h-12 items-center justify-center gap-2 border text-xs font-semibold tracking-widest uppercase transition hover:bg-muted",
+                        "omat-answer-button flex h-12 items-center justify-center gap-2 border text-xs font-semibold tracking-widest uppercase transition hover:bg-muted",
                         currentAnswer?.value === option.value &&
-                          "bg-foreground text-background hover:bg-foreground hover:text-background"
+                          "is-selected bg-foreground text-background hover:bg-foreground hover:text-background"
                       )}
                       onClick={() => answerQuestion(option.value)}
                     >
@@ -256,8 +268,11 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
       ) : null}
 
       {stage === "doubling" ? (
-        <div className="relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-4xl items-center">
-          <div className="w-full border bg-card">
+        <div
+          key="doubling"
+          className="omat-runner-stage relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-4xl items-center"
+        >
+          <div className="omat-runner-card w-full border bg-card">
             <div className="border-b p-5">
               <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                 Gewichtungen wählen
@@ -283,9 +298,10 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
                     <button
                       key={question._id}
                       className={cn(
-                        "grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-muted",
-                        answer?.doubled && "bg-muted"
+                        "omat-weight-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-muted",
+                        answer?.doubled && "is-weighted bg-muted"
                       )}
+                      style={{ animationDelay: `${index * 45}ms` }}
                       onClick={() =>
                         setAnswers((current) => ({
                           ...current,
@@ -312,7 +328,7 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
                       </span>
                       <span
                         className={cn(
-                          "flex h-9 items-center gap-2 border px-3 text-xs font-semibold tracking-widest uppercase",
+                          "omat-weight-toggle flex h-9 items-center gap-2 border px-3 text-xs font-semibold tracking-widest uppercase",
                           answer?.doubled &&
                             "border-foreground bg-foreground text-background"
                         )}
@@ -346,8 +362,19 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
       ) : null}
 
       {stage === "results" ? (
-        <div className="relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-4xl items-center">
-          <div className="w-full border bg-card">
+        <div
+          key="results"
+          className="omat-runner-stage relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-4xl items-center"
+        >
+          <div className="omat-confetti" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="omat-runner-card w-full border bg-card">
             <div className="border-b p-5">
               <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                 Ergebnisse anzeigen
@@ -365,9 +392,10 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
                 <article key={party._id}>
                   <button
                     className={cn(
-                      "grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-muted",
+                      "omat-result-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-muted",
                       expandedPartyId === party._id && "bg-muted"
                     )}
+                    style={{ animationDelay: `${index * 70}ms` }}
                     aria-expanded={expandedPartyId === party._id}
                     onClick={() =>
                       setExpandedPartyId((current) =>
@@ -401,7 +429,7 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
                       </div>
                       <div className="mt-2 h-2 bg-muted">
                         <div
-                          className="h-full bg-foreground"
+                          className="omat-match-fill h-full bg-foreground"
                           style={{ width: `${match}%` }}
                         />
                       </div>
@@ -417,7 +445,7 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
                     </span>
                   </button>
                   {expandedPartyId === party._id ? (
-                    <div className="border-t bg-muted/30 p-5">
+                    <div className="omat-detail-panel border-t bg-muted/30 p-5">
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="flex items-center gap-2 text-xs font-semibold tracking-widest text-muted-foreground uppercase">

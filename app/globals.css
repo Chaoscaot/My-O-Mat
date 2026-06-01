@@ -131,3 +131,393 @@
     @apply font-sans;
   }
 }
+
+@layer components {
+  .omat-runner-shell {
+    background-color: color-mix(in oklch, var(--background), var(--primary) 4%);
+  }
+
+  .omat-runner-shell::after {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    content: "";
+    background-image:
+      linear-gradient(
+        115deg,
+        transparent 0 28%,
+        color-mix(in oklch, var(--primary), transparent 84%) 28% 29%,
+        transparent 29% 100%
+      ),
+      repeating-linear-gradient(
+        90deg,
+        color-mix(in oklch, var(--foreground), transparent 96%) 0 1px,
+        transparent 1px 72px
+      );
+    opacity: 0.9;
+    animation: omat-grid-drift 14s linear infinite;
+  }
+
+  .omat-runner-streams {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .omat-runner-streams span {
+    position: absolute;
+    left: -20%;
+    width: 44rem;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklch, var(--primary), white 22%),
+      transparent
+    );
+    opacity: 0.44;
+    transform: rotate(-12deg);
+    animation: omat-stream 5.8s ease-in-out infinite;
+  }
+
+  .omat-runner-streams span:nth-child(1) {
+    top: 24%;
+  }
+
+  .omat-runner-streams span:nth-child(2) {
+    top: 52%;
+    animation-delay: 1.45s;
+  }
+
+  .omat-runner-streams span:nth-child(3) {
+    top: 78%;
+    animation-delay: 2.9s;
+  }
+
+  .omat-runner-brand,
+  .omat-runner-stage {
+    animation: omat-stage-in 480ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+  .omat-runner-card {
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 28px 80px color-mix(in oklch, var(--foreground), transparent 88%),
+      0 1px 0 color-mix(in oklch, white, transparent 18%) inset;
+  }
+
+  .omat-runner-card::before {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    content: "";
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--primary), transparent 88%),
+      transparent 32% 68%,
+      color-mix(in oklch, var(--foreground), transparent 94%)
+    );
+  }
+
+  .omat-progress [data-slot="progress-indicator"] {
+    position: relative;
+    overflow: hidden;
+    transition-duration: 360ms;
+  }
+
+  .omat-progress [data-slot="progress-indicator"]::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklch, white, transparent 35%),
+      transparent
+    );
+    animation: omat-progress-shine 1.7s ease-in-out infinite;
+  }
+
+  .omat-question-block {
+    animation: omat-question-swap 420ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+  .omat-answer-button {
+    position: relative;
+    overflow: hidden;
+    transform: translateY(0);
+    transition:
+      transform 180ms ease,
+      background-color 180ms ease,
+      color 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .omat-answer-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px
+      color-mix(in oklch, var(--foreground), transparent 90%);
+  }
+
+  .omat-answer-button.is-selected {
+    animation: omat-answer-pop 260ms cubic-bezier(0.2, 1.35, 0.35, 1) both;
+  }
+
+  .omat-answer-button.is-selected svg,
+  .omat-weight-row.is-weighted .omat-weight-toggle svg {
+    animation: omat-icon-kick 420ms ease both;
+  }
+
+  .omat-weight-row,
+  .omat-result-row {
+    opacity: 0;
+    animation: omat-list-in 440ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+  .omat-weight-row.is-weighted .omat-weight-toggle {
+    animation: omat-answer-pop 260ms cubic-bezier(0.2, 1.35, 0.35, 1) both;
+  }
+
+  .omat-result-row:hover .omat-match-fill {
+    filter: brightness(1.15);
+  }
+
+  .omat-match-fill {
+    position: relative;
+    overflow: hidden;
+    transform-origin: left;
+    animation: omat-bar-grow 760ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  }
+
+  .omat-match-fill::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklch, var(--primary), white 45%),
+      transparent
+    );
+    opacity: 0.75;
+    animation: omat-progress-shine 1.35s ease-in-out infinite;
+  }
+
+  .omat-detail-panel {
+    animation: omat-detail-open 280ms ease both;
+  }
+
+  .omat-confetti {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .omat-confetti span {
+    position: absolute;
+    top: -1rem;
+    width: 0.6rem;
+    height: 1rem;
+    background: var(--primary);
+    opacity: 0;
+    animation: omat-confetti-drop 1.9s ease-out both;
+  }
+
+  .omat-confetti span:nth-child(1) {
+    left: 12%;
+    animation-delay: 120ms;
+  }
+
+  .omat-confetti span:nth-child(2) {
+    left: 26%;
+    width: 1rem;
+    height: 0.45rem;
+    background: var(--foreground);
+    animation-delay: 20ms;
+  }
+
+  .omat-confetti span:nth-child(3) {
+    left: 44%;
+    animation-delay: 220ms;
+  }
+
+  .omat-confetti span:nth-child(4) {
+    left: 62%;
+    width: 1rem;
+    height: 0.45rem;
+    background: var(--foreground);
+    animation-delay: 80ms;
+  }
+
+  .omat-confetti span:nth-child(5) {
+    left: 78%;
+    animation-delay: 180ms;
+  }
+
+  .omat-confetti span:nth-child(6) {
+    left: 90%;
+    width: 1rem;
+    height: 0.45rem;
+    animation-delay: 300ms;
+  }
+}
+
+@keyframes omat-stage-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes omat-question-swap {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes omat-list-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes omat-answer-pop {
+  0% {
+    transform: scale(1);
+  }
+  55% {
+    transform: scale(1.045);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes omat-icon-kick {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  45% {
+    transform: rotate(-10deg) scale(1.3);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+@keyframes omat-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes omat-detail-open {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes omat-stream {
+  0% {
+    opacity: 0;
+    transform: translateX(-12vw) rotate(-12deg);
+  }
+  20%,
+  70% {
+    opacity: 0.44;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(145vw) rotate(-12deg);
+  }
+}
+
+@keyframes omat-grid-drift {
+  from {
+    background-position:
+      0 0,
+      0 0;
+  }
+  to {
+    background-position:
+      120px 0,
+      72px 0;
+  }
+}
+
+@keyframes omat-progress-shine {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(110%);
+  }
+}
+
+@keyframes omat-confetti-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(0deg);
+  }
+  18% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(72vh) rotate(210deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .omat-runner-shell::after,
+  .omat-runner-streams span,
+  .omat-runner-brand,
+  .omat-runner-stage,
+  .omat-question-block,
+  .omat-answer-button.is-selected,
+  .omat-answer-button.is-selected svg,
+  .omat-weight-row,
+  .omat-result-row,
+  .omat-weight-row.is-weighted .omat-weight-toggle,
+  .omat-weight-row.is-weighted .omat-weight-toggle svg,
+  .omat-match-fill,
+  .omat-match-fill::after,
+  .omat-detail-panel,
+  .omat-confetti span,
+  .omat-progress [data-slot="progress-indicator"]::after {
+    animation: none;
+  }
+
+  .omat-answer-button:hover {
+    transform: none;
+  }
+}
