@@ -7,6 +7,7 @@ import {
   Check,
   CopyPlus,
   ListChecks,
+  MessageSquareText,
   Minus,
   RotateCcw,
   SkipForward,
@@ -27,9 +28,9 @@ const answerOptions: {
   label: string
   icon: typeof Check
 }[] = [
-  { value: "yes", label: "Ja", icon: Check },
+  { value: "yes", label: "Stimme Zu", icon: Check },
   { value: "neutral", label: "Neutral", icon: Minus },
-  { value: "no", label: "Nein", icon: X },
+  { value: "no", label: "Stimme Nicht Zu", icon: X },
   { value: "skip", label: "Überspringen", icon: SkipForward },
 ]
 
@@ -74,9 +75,20 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
     "answering"
   )
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [expandedPartyId, setExpandedPartyId] = useState<string | null>(null)
   const results = useMemo(
     () => scoreParties(data.parties, data.questions, data.positions, answers),
     [answers, data]
+  )
+  const positionByKey = useMemo(
+    () =>
+      new Map(
+        data.positions.map((position) => [
+          `${position.partyId}:${position.questionId}`,
+          position,
+        ])
+      ),
+    [data.positions]
   )
   const currentQuestion = data.questions[currentQuestionIndex]
   const currentAnswer = currentQuestion ? answers[currentQuestion._id] : null
@@ -93,6 +105,9 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
     data.questions.length === 0
       ? 0
       : ((currentQuestionIndex + 1) / data.questions.length) * 100
+  const explanationQuestions = answeredQuestions.filter(
+    (question) => answers[question._id]?.value !== "skip"
+  )
 
   const answerQuestion = (value: AnswerValue) => {
     if (!currentQuestion) return
@@ -171,8 +186,7 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
                       `Frage ${currentQuestionIndex + 1}`}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Frage {currentQuestionIndex + 1} von{" "}
-                    {data.questions.length}
+                    Frage {currentQuestionIndex + 1} von {data.questions.length}
                   </p>
                 </div>
                 <Button variant="outline" size="sm" onClick={resetFlow}>
@@ -207,7 +221,7 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
                       className={cn(
                         "flex h-12 items-center justify-center gap-2 border text-xs font-semibold tracking-widest uppercase transition hover:bg-muted",
                         currentAnswer?.value === option.value &&
-                          "bg-foreground text-background"
+                          "bg-foreground text-background hover:bg-foreground hover:text-background"
                       )}
                       onClick={() => answerQuestion(option.value)}
                     >
@@ -348,45 +362,117 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
             </div>
             <div className="divide-y">
               {results.map(({ party, match }, index) => (
-                <div
-                  key={party._id}
-                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 p-4"
-                >
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {index + 1}
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      {party.logoUrl ? (
-                        <Image
-                          src={party.logoUrl}
-                          alt=""
-                          width={32}
-                          height={32}
-                          unoptimized
-                          className="size-8 shrink-0 border object-cover"
+                <article key={party._id}>
+                  <button
+                    className={cn(
+                      "grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 p-4 text-left transition hover:bg-muted",
+                      expandedPartyId === party._id && "bg-muted"
+                    )}
+                    aria-expanded={expandedPartyId === party._id}
+                    onClick={() =>
+                      setExpandedPartyId((current) =>
+                        current === party._id ? null : party._id
+                      )
+                    }
+                  >
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        {party.logoUrl ? (
+                          <Image
+                            src={party.logoUrl}
+                            alt=""
+                            width={32}
+                            height={32}
+                            unoptimized
+                            className="size-8 shrink-0 border object-cover"
+                          />
+                        ) : (
+                          <span
+                            className="size-3 border"
+                            style={{ backgroundColor: party.color }}
+                          />
+                        )}
+                        <span className="truncate font-semibold">
+                          {party.name}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-2 bg-muted">
+                        <div
+                          className="h-full bg-foreground"
+                          style={{ width: `${match}%` }}
                         />
-                      ) : (
-                        <span
-                          className="size-3 border"
-                          style={{ backgroundColor: party.color }}
-                        />
-                      )}
-                      <span className="truncate font-semibold">
-                        {party.name}
+                      </div>
+                    </div>
+                    <span className="text-right">
+                      <span className="block font-heading text-2xl font-semibold">
+                        {match}%
                       </span>
+                      <span className="mt-1 flex items-center justify-end gap-1 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                        <MessageSquareText className="size-3.5" />
+                        Details
+                      </span>
+                    </span>
+                  </button>
+                  {expandedPartyId === party._id ? (
+                    <div className="border-t bg-muted/30 p-5">
+                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="flex items-center gap-2 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                            <MessageSquareText className="size-3.5" />
+                            Begründungen
+                          </p>
+                          <h3 className="mt-1 truncate font-heading text-xl font-semibold">
+                            {party.name}
+                          </h3>
+                        </div>
+                        <span className="font-heading text-2xl font-semibold">
+                          {match}%
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {explanationQuestions.map((question, questionIndex) => {
+                          const position = positionByKey.get(
+                            `${party._id}:${question._id}`
+                          )
+                          const answer = answers[question._id]
+                          return (
+                            <article
+                              key={question._id}
+                              className="border bg-card p-4"
+                            >
+                              <div className="flex items-start gap-3">
+                                <span className="flex size-8 shrink-0 items-center justify-center border font-mono text-xs">
+                                  {questionIndex + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="font-medium">
+                                    {question.title || question.text}
+                                  </h4>
+                                  <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                                    <span>
+                                      Du: {formatAnswerValue(answer?.value)}
+                                    </span>
+                                    <span>
+                                      Partei:{" "}
+                                      {formatAnswerValue(position?.stance)}
+                                    </span>
+                                  </div>
+                                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                                    {position?.explanation ||
+                                      "Keine Begründung hinterlegt."}
+                                  </p>
+                                </div>
+                              </div>
+                            </article>
+                          )
+                        })}
+                      </div>
                     </div>
-                    <div className="mt-2 h-2 bg-muted">
-                      <div
-                        className="h-full bg-foreground"
-                        style={{ width: `${match}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="font-heading text-2xl font-semibold">
-                    {match}%
-                  </span>
-                </div>
+                  ) : null}
+                </article>
               ))}
             </div>
             <div className="flex items-center justify-between gap-3 border-t p-5">

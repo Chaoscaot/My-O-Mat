@@ -678,6 +678,7 @@ export const setPosition = mutation({
     partyId: v.id("parties"),
     questionId: v.id("questions"),
     stance: v.union(v.literal("yes"), v.literal("neutral"), v.literal("no")),
+    explanation: v.string(),
   },
   handler: async (ctx, args) => {
     await requireOmatAccess(ctx, args.omatId)
@@ -691,6 +692,7 @@ export const setPosition = mutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         stance: args.stance,
+        explanation: args.explanation.trim(),
         updatedAt: Date.now(),
       })
       return existing._id
@@ -701,7 +703,7 @@ export const setPosition = mutation({
       partyId: args.partyId,
       questionId: args.questionId,
       stance: args.stance,
-      explanation: "",
+      explanation: args.explanation.trim(),
       updatedAt: Date.now(),
     })
   },

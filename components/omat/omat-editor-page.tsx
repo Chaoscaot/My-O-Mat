@@ -753,6 +753,9 @@ function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
 
 function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
   const setPosition = useMutation(api.omats.setPosition)
+  const [explanationDrafts, setExplanationDrafts] = useState<
+    Record<string, string>
+  >({})
   const positionByKey = useMemo(
     () =>
       new Map(
@@ -763,13 +766,17 @@ function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
       ),
     [editor.positions]
   )
+  const getExplanationDraft = (
+    key: string,
+    position: Doc<"partyPositions"> | undefined
+  ) => explanationDrafts[key] ?? position?.explanation ?? ""
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-sm">
+      <table className="w-full min-w-[980px] border-collapse text-sm">
         <thead>
           <tr className="border-b bg-muted/60">
-            <th className="w-[44%] p-3 text-left font-semibold">Frage</th>
+            <th className="w-[34%] p-3 text-left font-semibold">Frage</th>
             {editor.parties.map((party) => (
               <th key={party._id} className="p-3 text-left font-semibold">
                 <span className="inline-flex items-center gap-2">
@@ -796,9 +803,11 @@ function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
                 </div>
               </td>
               {editor.parties.map((party) => {
+                const positionKey = `${party._id}:${question._id}`
                 const position = positionByKey.get(
-                  `${party._id}:${question._id}`
+                  positionKey
                 )
+                const explanation = getExplanationDraft(positionKey, position)
                 return (
                   <td key={party._id} className="p-3">
                     <div className="grid grid-cols-3 border">
@@ -808,7 +817,7 @@ function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
                           className={cn(
                             "h-8 border-r px-1 text-[0.65rem] font-semibold uppercase last:border-r-0 hover:bg-muted",
                             position?.stance === option.value &&
-                              "bg-foreground text-background"
+                              "bg-foreground text-background hover:bg-foreground hover:text-background"
                           )}
                           onClick={() =>
                             setPosition({
@@ -816,6 +825,7 @@ function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
                               partyId: party._id,
                               questionId: question._id,
                               stance: option.value,
+                              explanation,
                             })
                           }
                         >
@@ -823,6 +833,26 @@ function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
                         </button>
                       ))}
                     </div>
+                    <Textarea
+                      className="mt-2 min-h-24 resize-y text-xs leading-5"
+                      placeholder="Begründung"
+                      value={explanation}
+                      onChange={(event) =>
+                        setExplanationDrafts((current) => ({
+                          ...current,
+                          [positionKey]: event.target.value,
+                        }))
+                      }
+                      onBlur={() =>
+                        setPosition({
+                          omatId: editor.omat._id,
+                          partyId: party._id,
+                          questionId: question._id,
+                          stance: position?.stance ?? "neutral",
+                          explanation,
+                        })
+                      }
+                    />
                   </td>
                 )
               })}
