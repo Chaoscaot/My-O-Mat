@@ -32,7 +32,7 @@ const workflow = [
   {
     icon: PenLine,
     title: "Thesen entwerfen",
-    text: "Formuliere politische, schulische oder lokale Fragen und ordne sie nach Themen.",
+    text: "Formuliere politische, schulische oder lokale Thesen und ordne sie nach Themen.",
   },
   {
     icon: Users,
@@ -371,7 +371,7 @@ function ExamplesSection() {
           </div>
           <p className="max-w-md text-lg leading-8 text-[#5f574a]">
             My-O-Mat funktioniert überall dort, wo Menschen Positionen
-            vergleichen, Fragen erklären und Entscheidungen zugänglich machen
+            vergleichen, Thesen erklären und Entscheidungen zugänglich machen
             wollen.
           </p>
         </div>

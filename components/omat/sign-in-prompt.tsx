@@ -13,7 +13,7 @@ export function SignInPrompt() {
         Melde dich an, um O-Mats zu verwalten.
       </h2>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-        Erstelle Organisationen, definiere Parteien, schreibe Fragen und
+        Erstelle Organisationen, definiere Parteien, schreibe Thesen und
         veröffentliche eigene öffentliche O-Mats aus dem Arbeitsbereich.
       </p>
       <SignInButton>

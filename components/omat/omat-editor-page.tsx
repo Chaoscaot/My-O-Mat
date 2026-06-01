@@ -86,7 +86,7 @@ const editorTabs: {
   label: string
   icon: typeof FileQuestion
 }[] = [
-  { value: "questions", label: "Fragen", icon: FileQuestion },
+  { value: "questions", label: "Thesen", icon: FileQuestion },
   { value: "parties", label: "Parteien", icon: CircleSlash },
   { value: "answers", label: "Antworten", icon: Pencil },
   { value: "settings", label: "Einstellungen", icon: Settings },
@@ -161,7 +161,7 @@ function EditorPanel({ editor }: { editor: EditorData }) {
     return (
       <EmptyState
         title="Editor wird geladen"
-        text="Fragen, Parteien und Positionen werden geladen."
+        text="Thesen, Parteien und Positionen werden geladen."
       />
     )
   }
@@ -351,14 +351,14 @@ function QuestionsPage({ editor }: { editor: NonNullable<EditorData> }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-heading text-2xl font-semibold">Fragen</h2>
+          <h2 className="font-heading text-2xl font-semibold">Thesen</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ziehe Fragen, um die öffentliche Antwortreihenfolge zu ändern.
+            Ziehe Thesen, um die öffentliche Antwortreihenfolge zu ändern.
           </p>
         </div>
         <Button type="button" onClick={startCreatingQuestion}>
           <Plus />
-          Frage erstellen
+          These erstellen
         </Button>
       </div>
 
@@ -398,7 +398,7 @@ function QuestionsPage({ editor }: { editor: NonNullable<EditorData> }) {
                 onClick={() => startEditing(question)}
               >
                 <Pencil />
-                <span className="sr-only">Frage bearbeiten</span>
+                <span className="sr-only">These bearbeiten</span>
               </Button>
               <Button
                 type="button"
@@ -407,7 +407,7 @@ function QuestionsPage({ editor }: { editor: NonNullable<EditorData> }) {
                 onClick={() => deleteQuestion({ questionId: question._id })}
               >
                 <Trash2 />
-                <span className="sr-only">Frage löschen</span>
+                <span className="sr-only">These löschen</span>
               </Button>
             </div>
           </article>
@@ -418,11 +418,11 @@ function QuestionsPage({ editor }: { editor: NonNullable<EditorData> }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingQuestion ? "Frage bearbeiten" : "Frage erstellen"}
+              {editingQuestion ? "These bearbeiten" : "These erstellen"}
             </DialogTitle>
             <DialogDescription>
               Verwende einen kurzen Titel für die Übersicht und die vollständige
-              Frage für den öffentlichen Durchlauf.
+              These für den öffentlichen Durchlauf.
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={submitQuestion}>
@@ -437,7 +437,7 @@ function QuestionsPage({ editor }: { editor: NonNullable<EditorData> }) {
               }
             />
             <Textarea
-              placeholder="Vollständige Frage"
+              placeholder="Vollständige These"
               value={questionForm.text}
               onChange={(event) =>
                 setQuestionForm((current) => ({
@@ -466,7 +466,7 @@ function QuestionsPage({ editor }: { editor: NonNullable<EditorData> }) {
               </Button>
               <Button>
                 <Plus />
-                {editingQuestion ? "Frage speichern" : "Frage erstellen"}
+                {editingQuestion ? "These speichern" : "These erstellen"}
               </Button>
             </DialogFooter>
           </form>
@@ -776,7 +776,7 @@ function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
       <table className="w-full min-w-[980px] border-collapse text-sm">
         <thead>
           <tr className="border-b bg-muted/60">
-            <th className="w-[34%] p-3 text-left font-semibold">Frage</th>
+            <th className="w-[34%] p-3 text-left font-semibold">These</th>
             {editor.parties.map((party) => (
               <th key={party._id} className="p-3 text-left font-semibold">
                 <span className="inline-flex items-center gap-2">

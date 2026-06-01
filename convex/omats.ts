@@ -489,7 +489,7 @@ export const updateQuestion = mutation({
   handler: async (ctx, args) => {
     const question = await ctx.db.get(args.questionId)
     if (!question) {
-        throw new Error("Frage nicht gefunden")
+        throw new Error("These nicht gefunden")
     }
     await requireOmatAccess(ctx, question.omatId)
     await ctx.db.patch(args.questionId, {
@@ -546,7 +546,7 @@ export const reorderQuestions = mutation({
     for (const [index, questionId] of args.questionIds.entries()) {
       const question = await ctx.db.get(questionId)
       if (!question || question.omatId !== args.omatId) {
-        throw new Error("Frage gehört nicht zu diesem O-Mat")
+        throw new Error("These gehört nicht zu diesem O-Mat")
       }
       await ctx.db.patch(questionId, { order: index })
     }

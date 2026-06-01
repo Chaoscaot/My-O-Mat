@@ -188,14 +188,14 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-                    Fragen beantworten
+                    Thesen beantworten
                   </p>
                   <h2 className="mt-1 font-heading text-2xl font-semibold">
                     {currentQuestion.title ||
-                      `Frage ${currentQuestionIndex + 1}`}
+                      `These ${currentQuestionIndex + 1}`}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Frage {currentQuestionIndex + 1} von {data.questions.length}
+                    These {currentQuestionIndex + 1} von {data.questions.length}
                   </p>
                 </div>
                 <Button variant="outline" size="sm" onClick={resetFlow}>
@@ -282,9 +282,9 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {weightedQuestions.length === 0
-                  ? "Keine Fragen sind gewichtet."
+                  ? "Keine Thesen sind gewichtet."
                   : `${weightedQuestions.length} ${
-                      weightedQuestions.length === 1 ? "Frage" : "Fragen"
+                      weightedQuestions.length === 1 ? "These" : "Thesen"
                     } gewichtet.`}
               </p>
             </div>
@@ -383,7 +383,7 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
                 Beste Übereinstimmung
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {answeredCount} von {data.questions.length} Fragen beantwortet,
+                {answeredCount} von {data.questions.length} Thesen beantwortet,
                 davon {weightedQuestions.length} gewichtet.
               </p>
             </div>

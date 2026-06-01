@@ -396,7 +396,7 @@ export function WorkspaceSwitcher() {
             <AlertDialogDescription>
               {deleteTarget?.kind === "organization"
                 ? "Dadurch werden die Organisation und alle enthaltenen O-Mats gelöscht."
-                : "Dadurch werden der ausgewählte O-Mat sowie seine Parteien, Fragen und Positionen gelöscht."}
+                : "Dadurch werden der ausgewählte O-Mat sowie seine Parteien, Thesen und Positionen gelöscht."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
