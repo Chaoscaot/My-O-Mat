@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/convex/_generated/api"
 import { EmptyState } from "./empty-state"
@@ -247,17 +248,25 @@ function DashboardPanel({
                 Der O-Mat wird in {workspace.name} angelegt.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-3">
-              <Input
-                placeholder="O-Mat-Titel"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-              />
-              <Textarea
-                placeholder="Kurze Beschreibung"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-              />
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="new-omat-title">Titel</Label>
+                <Input
+                  id="new-omat-title"
+                  placeholder="z. B. Kommunalwahl 2026 in Musterstadt"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="new-omat-description">Beschreibung</Label>
+                <Textarea
+                  id="new-omat-description"
+                  placeholder="z. B. Vergleiche die Positionen der Kandidierenden vor Ort."
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button disabled={isSubmitting || !title.trim()} type="submit">

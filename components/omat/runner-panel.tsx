@@ -104,7 +104,7 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
   const progress =
     data.questions.length === 0
       ? 0
-      : ((currentQuestionIndex + 1) / data.questions.length) * 100
+      : (currentQuestionIndex / (data.questions.length - 1)) * 100
   const explanationQuestions = answeredQuestions.filter(
     (question) => answers[question._id]?.value !== "skip"
   )
@@ -170,9 +170,6 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
       </div>
 
       <div className="omat-runner-brand absolute top-4 left-4 z-10 max-w-[calc(100vw-2rem)] md:top-6 md:left-8 md:max-w-xs">
-        <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-          Live-O-Mat
-        </p>
         <h1 className="mt-1 truncate font-heading text-2xl font-semibold">
           {data.omat.title}
         </h1>
@@ -187,9 +184,6 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
             <div className="border-b p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-                    Thesen beantworten
-                  </p>
                   <h2 className="mt-1 font-heading text-2xl font-semibold">
                     {currentQuestion.title ||
                       `These ${currentQuestionIndex + 1}`}

@@ -20,7 +20,16 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { ChangeEvent, FormEvent, useMemo, useState } from "react"
+import {
+  ChangeEvent,
+  Fragment,
+  FormEvent,
+  PointerEvent as ReactPointerEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -32,6 +41,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -55,6 +65,18 @@ type QuestionFormState = {
   title: string
   text: string
   context: string
+}
+type QuestionDoc = Doc<"questions">
+type QuestionDragState = {
+  questionId: Id<"questions">
+  pointerId: number
+  pointerY: number
+  pointerOffsetY: number
+  itemHeight: number
+  listRect: DOMRect
+  itemRect: DOMRect
+  sourceIndex: number
+  targetIndex: number
 }
 type PartyFormState = {
   name: string
@@ -107,6 +129,85 @@ async function uploadFile(
   }
   const { storageId } = (await result.json()) as { storageId: Id<"_storage"> }
   return storageId
+}
+
+function reorderQuestionList(
+  questions: QuestionDoc[],
+  questionId: Id<"questions">,
+  targetIndex: number
+) {
+  const fromIndex = questions.findIndex((question) => question._id === questionId)
+  if (fromIndex < 0) return questions
+
+  const nextQuestions = [...questions]
+  const [movedQuestion] = nextQuestions.splice(fromIndex, 1)
+  nextQuestions.splice(
+    Math.min(Math.max(targetIndex, 0), nextQuestions.length),
+    0,
+    movedQuestion
+  )
+  return nextQuestions
+}
+
+function QuestionDragPreview({
+  dragState,
+  question,
+  index,
+}: {
+  dragState: QuestionDragState
+  question: QuestionDoc
+  index: number
+}) {
+  const top = Math.min(
+    Math.max(
+      dragState.pointerY - dragState.pointerOffsetY,
+      dragState.listRect.top
+    ),
+    dragState.listRect.bottom - dragState.itemHeight
+  )
+
+  return (
+    <article
+      className="pointer-events-none fixed z-50 grid gap-3 border bg-card p-4 shadow-[0_18px_48px_color-mix(in_oklch,var(--foreground),transparent_84%)] ring-2 ring-ring/25 sm:grid-cols-[auto_1fr_auto]"
+      style={{
+        top,
+        left: dragState.listRect.left,
+        width: dragState.listRect.width,
+        minHeight: dragState.itemRect.height,
+      }}
+      aria-hidden
+    >
+      <div className="flex items-center gap-2">
+        <span className="flex size-8 items-center justify-center border bg-background font-mono text-xs">
+          {index + 1}
+        </span>
+        <span className="flex size-8 items-center justify-center border bg-primary text-primary-foreground">
+          <GripVertical className="size-4" />
+        </span>
+      </div>
+      <div className="min-w-0">
+        <h2 className="leading-6 font-medium">{question.title || question.text}</h2>
+        <p className="mt-1 text-sm leading-6">{question.text}</p>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          {question.context || "Kein Kontext hinzugefügt."}
+        </p>
+      </div>
+      <div className="hidden items-start justify-end sm:flex">
+        <span className="border px-2 py-1 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+          Vorschau
+        </span>
+      </div>
+    </article>
+  )
+}
+
+function QuestionDropMarker() {
+  return (
+    <div
+      className="pointer-events-none h-0 border-t-2 border-primary shadow-[0_0_0_1px_color-mix(in_oklch,var(--primary),transparent_55%)]"
+      aria-hidden
+    />
+  )
 }
 
 export function OmatEditorPage({ omatRef }: { omatRef: string }) {
@@ -274,12 +375,100 @@ function QuestionsPage({ editor }: { editor: NonNullable<EditorData> }) {
   })
   const [editingQuestionId, setEditingQuestionId] =
     useState<Id<"questions"> | null>(null)
-  const [draggedQuestionId, setDraggedQuestionId] =
-    useState<Id<"questions"> | null>(null)
+  const [dragState, setDragState] = useState<QuestionDragState | null>(null)
+  const dragStateRef = useRef<QuestionDragState | null>(null)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const isDragging = dragState !== null
 
   const editingQuestion = editor.questions.find(
     (question) => question._id === editingQuestionId
   )
+  const draggedQuestion = dragState
+    ? editor.questions.find((question) => question._id === dragState.questionId)
+    : null
+
+  useEffect(() => {
+    dragStateRef.current = dragState
+  }, [dragState])
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    function getTargetIndex(
+      currentDragState: QuestionDragState,
+      clientY: number
+    ) {
+      const rows = Array.from(
+        listRef.current?.querySelectorAll<HTMLElement>("[data-question-row]") ??
+          []
+      ).filter(
+        (element) => element.dataset.questionId !== currentDragState.questionId
+      )
+      const row = rows.find((element) => {
+        const rect = element.getBoundingClientRect()
+        return clientY < rect.top + rect.height / 2
+      })
+
+      if (!row) return rows.length
+
+      const rowIndex = rows.indexOf(row)
+      return rowIndex < 0 ? currentDragState.targetIndex : rowIndex
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      const currentDragState = dragStateRef.current
+      if (!currentDragState || event.pointerId !== currentDragState.pointerId) {
+        return
+      }
+
+      const nextPointerY = Math.min(
+        Math.max(event.clientY, currentDragState.listRect.top),
+        currentDragState.listRect.bottom
+      )
+      const nextDragState = {
+        ...currentDragState,
+        pointerY: nextPointerY,
+        targetIndex: getTargetIndex(currentDragState, nextPointerY),
+      }
+      dragStateRef.current = nextDragState
+      setDragState(nextDragState)
+    }
+
+    async function handlePointerUp(event: PointerEvent) {
+      const currentDragState = dragStateRef.current
+      if (!currentDragState || event.pointerId !== currentDragState.pointerId) {
+        return
+      }
+
+      dragStateRef.current = null
+      setDragState(null)
+
+      const fromIndex = editor.questions.findIndex(
+        (question) => question._id === currentDragState.questionId
+      )
+      if (fromIndex < 0 || fromIndex === currentDragState.targetIndex) return
+
+      const nextQuestions = reorderQuestionList(
+        editor.questions,
+        currentDragState.questionId,
+        currentDragState.targetIndex
+      )
+      await reorderQuestions({
+        omatId: editor.omat._id,
+        questionIds: nextQuestions.map((question) => question._id),
+      })
+    }
+
+    window.addEventListener("pointermove", handlePointerMove)
+    window.addEventListener("pointerup", handlePointerUp)
+    window.addEventListener("pointercancel", handlePointerUp)
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove)
+      window.removeEventListener("pointerup", handlePointerUp)
+      window.removeEventListener("pointercancel", handlePointerUp)
+    }
+  }, [isDragging, editor.omat._id, editor.questions, reorderQuestions])
 
   async function submitQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -326,26 +515,42 @@ function QuestionsPage({ editor }: { editor: NonNullable<EditorData> }) {
     setQuestionDialogOpen(false)
   }
 
-  async function moveQuestion(targetQuestionId: Id<"questions">) {
-    if (!draggedQuestionId || draggedQuestionId === targetQuestionId) return
+  function startQuestionDrag(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    questionId: Id<"questions">
+  ) {
+    if (event.button !== 0) return
 
-    const fromIndex = editor.questions.findIndex(
-      (question) => question._id === draggedQuestionId
-    )
-    const toIndex = editor.questions.findIndex(
-      (question) => question._id === targetQuestionId
-    )
-    if (fromIndex < 0 || toIndex < 0) return
+    const row = event.currentTarget.closest<HTMLElement>("[data-question-row]")
+    const list = listRef.current
+    if (!row || !list) return
 
-    const nextQuestions = [...editor.questions]
-    const [movedQuestion] = nextQuestions.splice(fromIndex, 1)
-    nextQuestions.splice(toIndex, 0, movedQuestion)
-    await reorderQuestions({
-      omatId: editor.omat._id,
-      questionIds: nextQuestions.map((question) => question._id),
-    })
-    setDraggedQuestionId(null)
+    const itemRect = row.getBoundingClientRect()
+    const listRect = list.getBoundingClientRect()
+    const targetIndex = editor.questions.findIndex(
+      (question) => question._id === questionId
+    )
+    if (targetIndex < 0) return
+
+    event.currentTarget.setPointerCapture(event.pointerId)
+    event.preventDefault()
+
+    const nextDragState = {
+      questionId,
+      pointerId: event.pointerId,
+      pointerY: event.clientY,
+      pointerOffsetY: event.clientY - itemRect.top,
+      itemHeight: itemRect.height,
+      listRect,
+      itemRect,
+      sourceIndex: targetIndex,
+      targetIndex,
+    }
+    dragStateRef.current = nextDragState
+    setDragState(nextDragState)
   }
+
+  let dropMarkerIndex = 0
 
   return (
     <div className="space-y-4">
@@ -362,56 +567,93 @@ function QuestionsPage({ editor }: { editor: NonNullable<EditorData> }) {
         </Button>
       </div>
 
-      <div className="space-y-3">
-        {editor.questions.map((question, index) => (
-          <article
-            key={question._id}
-            draggable
-            onDragStart={() => setDraggedQuestionId(question._id)}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={() => moveQuestion(question._id)}
-            className={cn(
-              "grid gap-3 border p-4 transition hover:bg-muted/50 sm:grid-cols-[auto_1fr_auto]",
-              draggedQuestionId === question._id && "opacity-50"
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center border font-mono text-xs">
-                {index + 1}
-              </span>
-              <GripVertical className="size-4 text-muted-foreground" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="leading-6 font-medium">
-                {question.title || question.text}
-              </h2>
-              <p className="mt-1 text-sm leading-6">{question.text}</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {question.context || "Kein Kontext hinzugefügt."}
-              </p>
-            </div>
-            <div className="flex gap-2 sm:justify-end">
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="outline"
-                onClick={() => startEditing(question)}
+      <div ref={listRef} className="relative space-y-3">
+        {editor.questions.map((question, index) => {
+          const isDragged = dragState?.questionId === question._id
+          const showDropMarker =
+            dragState &&
+            dragState.sourceIndex !== dragState.targetIndex &&
+            !isDragged &&
+            dropMarkerIndex === dragState.targetIndex
+
+          if (!isDragged) {
+            dropMarkerIndex += 1
+          }
+
+          return (
+            <Fragment key={question._id}>
+              {showDropMarker ? <QuestionDropMarker /> : null}
+              <article
+                data-question-row
+                data-question-id={question._id}
+                className={cn(
+                  "grid gap-3 border p-4 transition hover:bg-muted/50 sm:grid-cols-[auto_1fr_auto]",
+                  isDragged && "border-dashed bg-muted/30 opacity-45"
+                )}
               >
-                <Pencil />
-                <span className="sr-only">These bearbeiten</span>
-              </Button>
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="destructive"
-                onClick={() => deleteQuestion({ questionId: question._id })}
-              >
-                <Trash2 />
-                <span className="sr-only">These löschen</span>
-              </Button>
-            </div>
-          </article>
-        ))}
+                <div className="flex items-center gap-2">
+                  <span className="flex size-8 items-center justify-center border font-mono text-xs">
+                    {index + 1}
+                  </span>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex size-8 touch-none items-center justify-center border text-muted-foreground transition hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none",
+                      isDragged && "cursor-grabbing"
+                    )}
+                    onPointerDown={(event) =>
+                      startQuestionDrag(event, question._id)
+                    }
+                    aria-label={`These ${index + 1} verschieben`}
+                  >
+                    <GripVertical className="size-4" />
+                  </button>
+                </div>
+                <div className="min-w-0">
+                  <h2 className="leading-6 font-medium">
+                    {question.title || question.text}
+                  </h2>
+                  <p className="mt-1 text-sm leading-6">{question.text}</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {question.context || "Kein Kontext hinzugefügt."}
+                  </p>
+                </div>
+                <div className="flex gap-2 sm:justify-end">
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="outline"
+                    onClick={() => startEditing(question)}
+                  >
+                    <Pencil />
+                    <span className="sr-only">These bearbeiten</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="destructive"
+                    onClick={() => deleteQuestion({ questionId: question._id })}
+                  >
+                    <Trash2 />
+                    <span className="sr-only">These löschen</span>
+                  </Button>
+                </div>
+              </article>
+            </Fragment>
+          )
+        })}
+        {dragState &&
+        dragState.sourceIndex !== dragState.targetIndex &&
+        dragState.targetIndex === editor.questions.length - 1 ? (
+          <QuestionDropMarker />
+        ) : null}
+        {dragState && draggedQuestion ? (
+          <QuestionDragPreview
+            dragState={dragState}
+            question={draggedQuestion}
+            index={dragState.targetIndex}
+          />
+        ) : null}
       </div>
 
       <Dialog open={questionDialogOpen} onOpenChange={setQuestionDialogOpen}>
@@ -426,36 +668,48 @@ function QuestionsPage({ editor }: { editor: NonNullable<EditorData> }) {
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={submitQuestion}>
-            <Input
-              placeholder="Kurzer Titel"
-              value={questionForm.title}
-              onChange={(event) =>
-                setQuestionForm((current) => ({
-                  ...current,
-                  title: event.target.value,
-                }))
-              }
-            />
-            <Textarea
-              placeholder="Vollständige These"
-              value={questionForm.text}
-              onChange={(event) =>
-                setQuestionForm((current) => ({
-                  ...current,
-                  text: event.target.value,
-                }))
-              }
-            />
-            <Input
-              placeholder="Optionaler Kontext"
-              value={questionForm.context}
-              onChange={(event) =>
-                setQuestionForm((current) => ({
-                  ...current,
-                  context: event.target.value,
-                }))
-              }
-            />
+            <div className="grid gap-2">
+              <Label htmlFor="question-title">Kurzer Titel</Label>
+              <Input
+                id="question-title"
+                placeholder="z. B. Bezahlbarer Wohnraum"
+                value={questionForm.title}
+                onChange={(event) =>
+                  setQuestionForm((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="question-text">Vollständige These</Label>
+              <Textarea
+                id="question-text"
+                placeholder="z. B. Die Stadt soll mehr Geld in sozialen Wohnungsbau investieren."
+                value={questionForm.text}
+                onChange={(event) =>
+                  setQuestionForm((current) => ({
+                    ...current,
+                    text: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="question-context">Kontext</Label>
+              <Input
+                id="question-context"
+                placeholder="z. B. Betrifft den städtischen Haushalt 2027."
+                value={questionForm.context}
+                onChange={(event) =>
+                  setQuestionForm((current) => ({
+                    ...current,
+                    context: event.target.value,
+                  }))
+                }
+              />
+            </div>
             <DialogFooter>
               <Button
                 type="button"
@@ -660,58 +914,76 @@ function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
             </DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={submitParty}>
-            <Input
-              placeholder="Parteiname"
-              value={partyForm.name}
-              onChange={(event) =>
-                setPartyForm((current) => ({
-                  ...current,
-                  name: event.target.value,
-                }))
-              }
-            />
-            <Input
-              placeholder="Kurzbezeichnung"
-              value={partyForm.shortName}
-              onChange={(event) =>
-                setPartyForm((current) => ({
-                  ...current,
-                  shortName: event.target.value,
-                }))
-              }
-            />
-            <Textarea
-              placeholder="Beschreibung"
-              value={partyForm.description}
-              onChange={(event) =>
-                setPartyForm((current) => ({
-                  ...current,
-                  description: event.target.value,
-                }))
-              }
-            />
-            <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
-              <input
-                className="size-10 border bg-transparent"
-                type="color"
-                value={partyForm.color}
-                onChange={(event) =>
-                  setPartyForm((current) => ({
-                    ...current,
-                    color: event.target.value,
-                  }))
-                }
-                aria-label="Parteifarbe"
-              />
+            <div className="grid gap-2">
+              <Label htmlFor="party-name">Parteiname</Label>
               <Input
-                value={partyForm.color}
+                id="party-name"
+                placeholder="z. B. Liste Zukunft Musterstadt"
+                value={partyForm.name}
                 onChange={(event) =>
                   setPartyForm((current) => ({
                     ...current,
-                    color: event.target.value,
+                    name: event.target.value,
                   }))
                 }
               />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="party-short-name">Kurzbezeichnung</Label>
+              <Input
+                id="party-short-name"
+                placeholder="z. B. LZM"
+                value={partyForm.shortName}
+                onChange={(event) =>
+                  setPartyForm((current) => ({
+                    ...current,
+                    shortName: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="party-description">Beschreibung</Label>
+              <Textarea
+                id="party-description"
+                placeholder="z. B. Eine lokale Wählergruppe mit Fokus auf Klima und Verkehr."
+                value={partyForm.description}
+                onChange={(event) =>
+                  setPartyForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="party-color">Parteifarbe</Label>
+              <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
+                <input
+                  id="party-color-picker"
+                  className="size-10 border bg-transparent"
+                  type="color"
+                  value={partyForm.color}
+                  onChange={(event) =>
+                    setPartyForm((current) => ({
+                      ...current,
+                      color: event.target.value,
+                    }))
+                  }
+                  aria-label="Parteifarbe auswählen"
+                />
+                <Input
+                  id="party-color"
+                  placeholder="z. B. #0f766e"
+                  value={partyForm.color}
+                  onChange={(event) =>
+                    setPartyForm((current) => ({
+                      ...current,
+                      color: event.target.value,
+                    }))
+                  }
+                />
+              </div>
             </div>
             <label className="flex min-h-24 items-center justify-center border border-dashed p-4 text-center text-sm text-muted-foreground">
               <input
@@ -833,26 +1105,35 @@ function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
                         </button>
                       ))}
                     </div>
-                    <Textarea
-                      className="mt-2 min-h-24 resize-y text-xs leading-5"
-                      placeholder="Begründung"
-                      value={explanation}
-                      onChange={(event) =>
-                        setExplanationDrafts((current) => ({
-                          ...current,
-                          [positionKey]: event.target.value,
-                        }))
-                      }
-                      onBlur={() =>
-                        setPosition({
-                          omatId: editor.omat._id,
-                          partyId: party._id,
-                          questionId: question._id,
-                          stance: position?.stance ?? "neutral",
-                          explanation,
-                        })
-                      }
-                    />
+                    <div className="mt-2 grid gap-2">
+                      <Label
+                        className="text-[0.65rem]"
+                        htmlFor={`explanation-${positionKey}`}
+                      >
+                        Begründung
+                      </Label>
+                      <Textarea
+                        id={`explanation-${positionKey}`}
+                        className="min-h-24 resize-y text-xs leading-5"
+                        placeholder="z. B. Wir stimmen zu, weil die Maßnahme bezahlbar und wirksam ist."
+                        value={explanation}
+                        onChange={(event) =>
+                          setExplanationDrafts((current) => ({
+                            ...current,
+                            [positionKey]: event.target.value,
+                          }))
+                        }
+                        onBlur={() =>
+                          setPosition({
+                            omatId: editor.omat._id,
+                            partyId: party._id,
+                            questionId: question._id,
+                            stance: position?.stance ?? "neutral",
+                            explanation,
+                          })
+                        }
+                      />
+                    </div>
                   </td>
                 )
               })}
@@ -923,21 +1204,35 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
           <div className="mb-4 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
             Grundeinstellungen
           </div>
-          <Input
-            placeholder="Titel"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-          />
-          <Textarea
-            placeholder="Beschreibung"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-          <Input
-            placeholder="Eigener Slug"
-            value={slug}
-            onChange={(event) => setSlug(event.target.value)}
-          />
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="settings-title">Titel</Label>
+              <Input
+                id="settings-title"
+                placeholder="z. B. Jugend-O-Mat 2026"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="settings-description">Beschreibung</Label>
+              <Textarea
+                id="settings-description"
+                placeholder="z. B. Ein öffentlicher Vergleich zu Bildung, Klima und Mobilität."
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="settings-slug">Eigener Slug</Label>
+              <Input
+                id="settings-slug"
+                placeholder="z. B. jugend-o-mat-2026"
+                value={slug}
+                onChange={(event) => setSlug(event.target.value)}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="border p-5">

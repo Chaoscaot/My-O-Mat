@@ -16,10 +16,15 @@ import {
   Users,
   Vote,
 } from "lucide-react"
+import type { Metadata } from "next"
 import Link from "next/link"
 
 import { AuthNav } from "@/components/auth-nav"
 import { Button } from "@/components/ui/button"
+
+export const metadata: Metadata = {
+  title: "Eigene Wahlhelfer erstellen",
+}
 
 const navItems = [
   ["Ablauf", "#ablauf"],

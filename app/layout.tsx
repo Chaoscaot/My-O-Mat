@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs"
 import { deDE } from "@clerk/localizations"
+import type { Metadata } from "next"
 import { Geist_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google"
 
 import "./globals.css"
@@ -22,6 +23,13 @@ const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
+
+export const metadata: Metadata = {
+  title: {
+    default: "My-O-Mat",
+    template: "%s | My-O-Mat",
+  },
+}
 
 export default function RootLayout({
   children,
