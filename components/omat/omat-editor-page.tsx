@@ -56,10 +56,11 @@ import { api } from "@/convex/_generated/api"
 import { type Doc, type Id } from "@/convex/_generated/dataModel"
 import { cn } from "@/lib/utils"
 import { EmptyState } from "./empty-state"
+import { RunnerPanel } from "./runner-panel"
 import { SignInPrompt } from "./sign-in-prompt"
 import { type EditorData, type Stance } from "./types"
 
-type EditorTab = "questions" | "parties" | "answers" | "settings"
+type EditorTab = "questions" | "parties" | "answers" | "preview" | "settings"
 type ColorScheme = "civic" | "forest" | "sunset" | "mono"
 type QuestionFormState = {
   title: string
@@ -115,6 +116,7 @@ const editorTabs: {
   { value: "questions", label: "Thesen", icon: FileQuestion },
   { value: "parties", label: "Parteien", icon: CircleSlash },
   { value: "answers", label: "Antworten", icon: Pencil },
+  { value: "preview", label: "Vorschau", icon: Eye },
   { value: "settings", label: "Einstellungen", icon: Settings },
 ]
 
@@ -361,12 +363,40 @@ function EditorPanel({ editor }: { editor: EditorData }) {
           <TabsContent value="answers" className="p-0">
             <AnswersPage editor={editor} />
           </TabsContent>
+          <TabsContent value="preview" className="p-5">
+            <PreviewPage editor={editor} />
+          </TabsContent>
           <TabsContent value="settings" className="p-5">
             <SettingsPage editor={editor} />
           </TabsContent>
         </Tabs>
       </div>
     </section>
+  )
+}
+
+function PreviewPage({ editor }: { editor: NonNullable<EditorData> }) {
+  const missingQuestions = editor.questions.length === 0
+  const missingParties = editor.parties.length === 0
+
+  if (missingQuestions || missingParties) {
+    return (
+      <EmptyState
+        title="Vorschau noch nicht bereit"
+        text={[
+          missingQuestions ? "Lege mindestens eine These an." : null,
+          missingParties ? "Lege mindestens eine Partei an." : null,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      />
+    )
+  }
+
+  return (
+    <div className="overflow-hidden border bg-background">
+      <RunnerPanel data={editor} preview />
+    </div>
   )
 }
 

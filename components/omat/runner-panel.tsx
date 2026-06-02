@@ -34,7 +34,13 @@ const answerOptions: {
   { value: "skip", label: "Überspringen", icon: SkipForward },
 ]
 
-export function RunnerPanel({ data }: { data: RunnerData }) {
+export function RunnerPanel({
+  data,
+  preview = false,
+}: {
+  data: RunnerData
+  preview?: boolean
+}) {
   if (data === undefined) {
     return (
       <EmptyState
@@ -64,12 +70,18 @@ export function RunnerPanel({ data }: { data: RunnerData }) {
           "[--primary:oklch(0.22_0_0)] [--ring:oklch(0.65_0_0)]"
       )}
     >
-      <RunnerContent key={data.omat._id} data={data} />
+      <RunnerContent key={data.omat._id} data={data} preview={preview} />
     </div>
   )
 }
 
-function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
+function RunnerContent({
+  data,
+  preview,
+}: {
+  data: NonNullable<RunnerData>
+  preview: boolean
+}) {
   const [answers, setAnswers] = useState<AnswerState>({})
   const [stage, setStage] = useState<"answering" | "doubling" | "results">(
     "answering"
@@ -154,6 +166,7 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
     <section
       className={cn(
         "omat-runner-shell relative isolate min-h-svh overflow-hidden bg-cover bg-center px-4 py-24 md:px-8",
+        preview && "min-h-[38rem] px-3 py-16 md:px-5",
         data.omat.backgroundUrl &&
           "before:pointer-events-none before:absolute before:inset-0 before:z-0 before:bg-background/80"
       )}
@@ -169,7 +182,12 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
         <span />
       </div>
 
-      <div className="omat-runner-brand absolute top-4 left-4 z-10 max-w-[calc(100vw-2rem)] md:top-6 md:left-8 md:max-w-xs">
+      <div
+        className={cn(
+          "omat-runner-brand absolute top-4 left-4 z-10 max-w-[calc(100vw-2rem)] md:top-6 md:left-8 md:max-w-xs",
+          preview && "md:left-5"
+        )}
+      >
         <h1 className="mt-1 truncate font-heading text-2xl font-semibold">
           {data.omat.title}
         </h1>
@@ -178,7 +196,10 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
       {stage === "answering" && currentQuestion ? (
         <div
           key="answering"
-          className="omat-runner-stage relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-3xl items-center"
+          className={cn(
+            "omat-runner-stage relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-3xl items-center",
+            preview && "min-h-[26rem]"
+          )}
         >
           <div className="omat-runner-card w-full border bg-card">
             <div className="border-b p-5">
@@ -264,7 +285,10 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
       {stage === "doubling" ? (
         <div
           key="doubling"
-          className="omat-runner-stage relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-4xl items-center"
+          className={cn(
+            "omat-runner-stage relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-4xl items-center",
+            preview && "min-h-[26rem]"
+          )}
         >
           <div className="omat-runner-card w-full border bg-card">
             <div className="border-b p-5">
@@ -358,7 +382,10 @@ function RunnerContent({ data }: { data: NonNullable<RunnerData> }) {
       {stage === "results" ? (
         <div
           key="results"
-          className="omat-runner-stage relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-4xl items-center"
+          className={cn(
+            "omat-runner-stage relative z-10 mx-auto flex min-h-[calc(100svh-12rem)] w-full max-w-4xl items-center",
+            preview && "min-h-[26rem]"
+          )}
         >
           <div className="omat-confetti" aria-hidden="true">
             <span />
