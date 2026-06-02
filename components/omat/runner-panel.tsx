@@ -14,7 +14,8 @@ import {
   X,
 } from "lucide-react"
 import Image from "next/image"
-import { useMemo, useState } from "react"
+import posthog from "posthog-js"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { cn } from "@/lib/utils"
 import { scoreParties } from "./matching"
@@ -122,6 +123,36 @@ function RunnerContent({
     (question) => answers[question._id]?.value !== "skip"
   )
   const showWatermarks = !data.omat.watermarksDisabled
+  const trackRunnerEvent = useCallback(
+    (event: string, properties: Record<string, unknown> = {}) => {
+      if (preview) return
+
+      posthog.capture(event, {
+        omat_id: data.omat._id,
+        omat_slug: data.omat.slug,
+        color_scheme: data.omat.colorScheme ?? "civic",
+        question_count: data.questions.length,
+        party_count: data.parties.length,
+        has_background: Boolean(data.omat.backgroundUrl),
+        watermarks_disabled: Boolean(data.omat.watermarksDisabled),
+        ...properties,
+      })
+    },
+    [
+      data.omat._id,
+      data.omat.backgroundUrl,
+      data.omat.colorScheme,
+      data.omat.slug,
+      data.omat.watermarksDisabled,
+      data.parties.length,
+      data.questions.length,
+      preview,
+    ]
+  )
+
+  useEffect(() => {
+    trackRunnerEvent("runner_viewed")
+  }, [trackRunnerEvent])
 
   const answerQuestion = (value: AnswerValue) => {
     if (!currentQuestion) return
@@ -147,13 +178,33 @@ function RunnerContent({
     setStage("doubling")
   }
 
-  const resetFlow = () => {
+  const goToPreviousQuestion = () => {
+    setCurrentQuestionIndex((index) => Math.max(0, index - 1))
+  }
+
+  const resetFlow = (source: "answering" | "results") => {
+    trackRunnerEvent("runner_reset", {
+      source,
+      stage,
+      current_question_index: currentQuestionIndex + 1,
+      response_count: Object.keys(answers).length,
+      answered_count: answeredCount,
+      skipped_count: countAnswersByValue(answers).skip,
+      weighted_count: weightedQuestions.length,
+      finished: stage === "results",
+    })
     setAnswers({})
     setCurrentQuestionIndex(0)
     setStage("answering")
   }
 
   const setNoDoubledQuestions = () => {
+    trackRunnerEvent("runner_weighting_selected", {
+      selection_action: "clear",
+      previous_weighted_count: weightedQuestions.length,
+      weighted_count: 0,
+      weighted_question_ids: [],
+    })
     setAnswers((current) =>
       Object.fromEntries(
         Object.entries(current).map(([questionId, answer]) => [
@@ -162,6 +213,65 @@ function RunnerContent({
         ])
       )
     )
+  }
+
+  const toggleQuestionWeight = (
+    question: (typeof data.questions)[number],
+    index: number
+  ) => {
+    const isCurrentlyWeighted = Boolean(answers[question._id]?.doubled)
+    const nextWeightedQuestionIds = Object.entries(answers)
+      .filter(([questionId, answer]) =>
+        questionId === question._id ? !isCurrentlyWeighted : answer.doubled
+      )
+      .map(([questionId]) => questionId)
+
+    trackRunnerEvent("runner_weighting_selected", {
+      selection_action: isCurrentlyWeighted ? "deselect" : "select",
+      question_id: question._id,
+      question_index: index + 1,
+      weighted_count: nextWeightedQuestionIds.length,
+      weighted_question_ids: nextWeightedQuestionIds,
+    })
+
+    setAnswers((current) => ({
+      ...current,
+      [question._id]: {
+        value: current[question._id]?.value ?? "neutral",
+        doubled: !current[question._id]?.doubled,
+      },
+    }))
+  }
+
+  const showResults = () => {
+    const answerCounts = countAnswersByValue(answers)
+    const topResult = results[0]
+
+    trackRunnerEvent("runner_finished", {
+      response_count: Object.keys(answers).length,
+      answered_count: answeredCount,
+      completion_rate:
+        data.questions.length === 0 ? 0 : answeredCount / data.questions.length,
+      weighted_count: weightedQuestions.length,
+      weighted_question_ids: weightedQuestions.map((question) => question._id),
+      yes_count: answerCounts.yes,
+      neutral_count: answerCounts.neutral,
+      no_count: answerCounts.no,
+      skipped_count: answerCounts.skip,
+      top_party_id: topResult?.party._id,
+      top_match: topResult?.match,
+      top_results: results.slice(0, 3).map(({ party, match }, index) => ({
+        party_id: party._id,
+        rank: index + 1,
+        match,
+      })),
+      result_count: results.length,
+    })
+    setStage("results")
+  }
+
+  const toggleResultDetails = (party: (typeof data.parties)[number]) => {
+    setExpandedPartyId((current) => (current === party._id ? null : party._id))
   }
 
   return (
@@ -215,7 +325,11 @@ function RunnerContent({
                     These {currentQuestionIndex + 1} von {data.questions.length}
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={resetFlow}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => resetFlow("answering")}
+                >
                   <RotateCcw />
                   Zurücksetzen
                 </Button>
@@ -265,9 +379,7 @@ function RunnerContent({
             <div className="flex items-center justify-between gap-3 border-t p-5">
               <Button
                 variant="outline"
-                onClick={() =>
-                  setCurrentQuestionIndex((index) => Math.max(0, index - 1))
-                }
+                onClick={goToPreviousQuestion}
                 disabled={currentQuestionIndex === 0}
               >
                 <ArrowLeft />
@@ -330,15 +442,7 @@ function RunnerContent({
                         answer?.doubled && "is-weighted bg-muted"
                       )}
                       style={{ animationDelay: `${index * 45}ms` }}
-                      onClick={() =>
-                        setAnswers((current) => ({
-                          ...current,
-                          [question._id]: {
-                            value: current[question._id]?.value ?? "neutral",
-                            doubled: !current[question._id]?.doubled,
-                          },
-                        }))
-                      }
+                      onClick={() => toggleQuestionWeight(question, index)}
                     >
                       <span className="flex size-8 items-center justify-center border font-mono text-xs">
                         {index + 1}
@@ -379,7 +483,7 @@ function RunnerContent({
                   <ListChecks />
                   Keine
                 </Button>
-                <Button onClick={() => setStage("results")}>
+                <Button onClick={showResults}>
                   <BarChart3 />
                   Ergebnisse anzeigen
                 </Button>
@@ -428,11 +532,7 @@ function RunnerContent({
                     )}
                     style={{ animationDelay: `${index * 70}ms` }}
                     aria-expanded={expandedPartyId === party._id}
-                    onClick={() =>
-                      setExpandedPartyId((current) =>
-                        current === party._id ? null : party._id
-                      )
-                    }
+                    onClick={() => toggleResultDetails(party)}
                   >
                     <span className="font-mono text-xs text-muted-foreground">
                       {index + 1}
@@ -547,7 +647,7 @@ function RunnerContent({
                   </Link>
                 </p>
               ) : null}
-              <Button variant="outline" onClick={resetFlow}>
+              <Button variant="outline" onClick={() => resetFlow("results")}>
                 <RotateCcw />
                 Neu starten
               </Button>
@@ -561,4 +661,14 @@ function RunnerContent({
 
 function formatAnswerValue(value: AnswerValue | undefined) {
   return answerOptions.find((option) => option.value === value)?.label ?? ""
+}
+
+function countAnswersByValue(answers: AnswerState) {
+  return Object.values(answers).reduce(
+    (counts, answer) => {
+      counts[answer.value] += 1
+      return counts
+    },
+    { yes: 0, neutral: 0, no: 0, skip: 0 } satisfies Record<AnswerValue, number>
+  )
 }
