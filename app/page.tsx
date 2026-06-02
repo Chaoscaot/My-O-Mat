@@ -134,6 +134,7 @@ export default function LandingPage() {
       <ExamplesSection />
       <ProofSection />
       <FinalCta />
+      <LegalFooter />
     </main>
   )
 }
@@ -463,5 +464,23 @@ function FinalCta() {
         </div>
       </div>
     </section>
+  )
+}
+
+function LegalFooter() {
+  return (
+    <footer className="border-t-2 border-[#1c1b17] bg-[#1c1b17] text-[#f4efe3]">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm md:flex-row md:items-center md:justify-between md:px-8">
+        <p className="font-heading text-xl font-semibold">My-O-Mat</p>
+        <nav className="flex flex-wrap gap-4 text-xs font-bold tracking-widest uppercase">
+          <Link className="hover:text-[#f6d96f]" href="/impressum">
+            Impressum
+          </Link>
+          <Link className="hover:text-[#f6d96f]" href="/datenschutz">
+            Datenschutz
+          </Link>
+        </nav>
+      </div>
+    </footer>
   )
 }

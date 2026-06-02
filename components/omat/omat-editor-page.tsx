@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "@clerk/nextjs"
+import { useAuth, useOrganization } from "@clerk/nextjs"
 import { useConvexAuth, useMutation, useQuery } from "convex/react"
 import {
   BadgeCheck,
@@ -85,6 +85,10 @@ type PartyFormState = {
   description: string
   color: string
   logoStorageId?: Id<"_storage">
+}
+
+function isPremiumPlan(value: unknown) {
+  return typeof value === "string" && value.toLowerCase() === "premium"
 }
 
 const stanceOptions: { value: Stance; label: string }[] = [
@@ -1182,6 +1186,8 @@ function AnswersPage({ editor }: { editor: NonNullable<EditorData> }) {
 }
 
 function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
+  const { isLoaded: isOrganizationLoaded, organization: clerkOrganization } =
+    useOrganization()
   const generateUploadUrl = useMutation(api.omats.generateUploadUrl)
   const updateSettings = useMutation(api.omats.updateOmatSettings)
   const setOmatBackground = useMutation(api.omats.setOmatBackground)
@@ -1192,8 +1198,25 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
   const [colorScheme, setColorScheme] = useState<ColorScheme>(
     editor.omat.colorScheme ?? "civic"
   )
+  const [watermarksDisabled, setWatermarksDisabled] = useState(
+    Boolean(editor.omat.watermarksDisabled)
+  )
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle")
+  const [saveError, setSaveError] = useState(
+    "Einstellungen konnten nicht gespeichert werden"
+  )
   const [isUploadingBackground, setIsUploadingBackground] = useState(false)
+  const isClerkOrganization =
+    clerkOrganization?.id === editor.organization.clerkOrganizationId
+  const syncedPremiumPlan = editor.organization.plan === "premium"
+  const currentClerkPlanIsPremium =
+    isClerkOrganization &&
+    isPremiumPlan(clerkOrganization?.publicMetadata?.plan)
+  const hasPremiumPlan =
+    editor.organization.clerkOrganizationId !== undefined &&
+    (isOrganizationLoaded && isClerkOrganization
+      ? currentClerkPlanIsPremium
+      : syncedPremiumPlan)
 
   async function submitSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -1205,10 +1228,16 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
         description,
         slug,
         colorScheme,
+        watermarksDisabled: hasPremiumPlan && watermarksDisabled,
         isPublished,
       })
       setSaveState("saved")
-    } catch {
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Einstellungen konnten nicht gespeichert werden"
+      )
       setSaveState("error")
     }
   }
@@ -1381,6 +1410,28 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
 
         <div className="border p-5">
           <div className="mb-4 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+            Branding
+          </div>
+          <label className="flex items-center justify-between gap-4">
+            <span>
+              <span className="block text-sm font-medium">
+                Wasserzeichen deaktivieren
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Nur Premium-Organisationen können My-O-Mat-Hinweise im Runner
+                ausblenden.
+              </span>
+            </span>
+            <Switch
+              checked={hasPremiumPlan && watermarksDisabled}
+              disabled={!hasPremiumPlan}
+              onCheckedChange={setWatermarksDisabled}
+            />
+          </label>
+        </div>
+
+        <div className="border p-5">
+          <div className="mb-4 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
             Vorschau
           </div>
           <div
@@ -1416,7 +1467,7 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
           ) : null}
           {saveState === "error" ? (
             <span className="text-xs font-semibold tracking-widest text-destructive uppercase">
-              Slug nicht verfügbar
+              {saveError}
             </span>
           ) : null}
         </div>

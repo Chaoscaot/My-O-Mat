@@ -7,6 +7,7 @@ export default defineSchema({
     description: v.string(),
     clerkWorkspaceId: v.optional(v.string()),
     clerkOrganizationId: v.optional(v.string()),
+    plan: v.optional(v.union(v.literal("free"), v.literal("premium"))),
     ownerTokenIdentifier: v.string(),
     createdAt: v.number(),
   })
@@ -27,6 +28,7 @@ export default defineSchema({
         v.literal("mono")
       )
     ),
+    watermarksDisabled: v.optional(v.boolean()),
     isPublished: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),

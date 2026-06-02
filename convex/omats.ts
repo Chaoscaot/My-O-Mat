@@ -17,6 +17,7 @@ const colorSchemeValidator = v.union(
   v.literal("sunset"),
   v.literal("mono")
 )
+type OrganizationPlan = "free" | "premium"
 
 async function requireIdentity(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity()
@@ -31,6 +32,19 @@ function getActiveOrganizationClaim(
 ) {
   const orgId = identity.org_id
   return typeof orgId === "string" ? orgId : null
+}
+
+function getActiveOrganizationPlan(
+  identity: Awaited<ReturnType<typeof requireIdentity>>
+): OrganizationPlan {
+  if (!getActiveOrganizationClaim(identity)) {
+    return "free"
+  }
+
+  const plan = identity.org_plan
+  return typeof plan === "string" && plan.toLowerCase() === "premium"
+    ? "premium"
+    : "free"
 }
 
 function getWorkspaceId(
@@ -79,6 +93,9 @@ async function ensureOrganizationForWorkspace(
 ) {
   const identity = await requireIdentity(ctx)
   const workspace = getWorkspaceId(identity, args.clerkOrganizationId)
+  const plan = workspace.clerkOrganizationId
+    ? getActiveOrganizationPlan(identity)
+    : "free"
   const existing = await getOrganizationByWorkspaceId(
     ctx,
     workspace.clerkWorkspaceId
@@ -91,6 +108,7 @@ async function ensureOrganizationForWorkspace(
       name,
       description,
       clerkOrganizationId: workspace.clerkOrganizationId,
+      plan,
       ownerTokenIdentifier: identity.tokenIdentifier,
     })
     return existing
@@ -101,6 +119,7 @@ async function ensureOrganizationForWorkspace(
     description,
     clerkWorkspaceId: workspace.clerkWorkspaceId,
     clerkOrganizationId: workspace.clerkOrganizationId,
+    plan,
     ownerTokenIdentifier: identity.tokenIdentifier,
     createdAt: Date.now(),
   })
@@ -267,6 +286,7 @@ export const createOmat = mutation({
       slug: `${slugify(args.title)}-${now.toString(36)}`,
       description: args.description.trim(),
       colorScheme: "civic",
+      watermarksDisabled: false,
       isPublished: false,
       createdAt: now,
       updatedAt: now,
@@ -466,17 +486,31 @@ export const updateOmatSettings = mutation({
     description: v.string(),
     slug: v.string(),
     colorScheme: colorSchemeValidator,
+    watermarksDisabled: v.boolean(),
     isPublished: v.boolean(),
   },
   handler: async (ctx, args) => {
-    await requireOmatAccess(ctx, args.omatId)
+    const { organization } = await requireOmatAccess(ctx, args.omatId)
+    const identity = await requireIdentity(ctx)
+    const plan = organization.clerkOrganizationId
+      ? getActiveOrganizationPlan(identity)
+      : "free"
+    if (args.watermarksDisabled && plan !== "premium") {
+      throw new Error(
+        "Wasserzeichen können nur in Premium-Organisationen deaktiviert werden"
+      )
+    }
     const slug = normalizeSlug(args.slug)
     await assertUniqueSlug(ctx, slug, args.omatId)
+    if (organization.plan !== plan) {
+      await ctx.db.patch(organization._id, { plan })
+    }
     await ctx.db.patch(args.omatId, {
       title: args.title.trim(),
       description: args.description.trim(),
       slug,
       colorScheme: args.colorScheme,
+      watermarksDisabled: args.watermarksDisabled && plan === "premium",
       isPublished: args.isPublished,
       updatedAt: Date.now(),
     })
@@ -794,6 +828,7 @@ export const getPublished = query({
     if (!omat || !omat.isPublished) {
       return null
     }
+    const organization = await ctx.db.get(omat.organizationId)
     const parties = await ctx.db
       .query("parties")
       .withIndex("by_omatId", (q) => q.eq("omatId", omat._id))
@@ -809,7 +844,11 @@ export const getPublished = query({
 
     const assets = await withAssetUrls(ctx, omat, parties)
     return {
-      omat: assets.omat,
+      omat: {
+        ...assets.omat,
+        watermarksDisabled:
+          assets.omat.watermarksDisabled && organization?.plan === "premium",
+      },
       parties: assets.parties,
       questions,
       positions,

@@ -22,6 +22,7 @@ import { type AnswerState, type AnswerValue, type RunnerData } from "./types"
 import { EmptyState } from "./empty-state"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import Link from "next/link"
 
 const answerOptions: {
   value: AnswerValue
@@ -120,6 +121,7 @@ function RunnerContent({
   const explanationQuestions = answeredQuestions.filter(
     (question) => answers[question._id]?.value !== "skip"
   )
+  const showWatermarks = !data.omat.watermarksDisabled
 
   const answerQuestion = (value: AnswerValue) => {
     if (!currentQuestion) return
@@ -271,6 +273,14 @@ function RunnerContent({
                 <ArrowLeft />
                 Zurück
               </Button>
+              {showWatermarks ? (
+                <p className="text-xs text-muted-foreground">
+                  Erstellt mit{" "}
+                  <Link href={"/"} className="hover:underline">
+                    My-O-Mat
+                  </Link>
+                </p>
+              ) : null}
               <Button onClick={goToNextQuestion} disabled={!currentAnswer}>
                 {currentQuestionIndex === data.questions.length - 1
                   ? "Gewichtungen wählen"
@@ -529,6 +539,14 @@ function RunnerContent({
                 <ArrowLeft />
                 Zurück
               </Button>
+              {showWatermarks ? (
+                <p className="text-muted-foreground">
+                  Erstellt mit{" "}
+                  <Link href={"/"} className="hover:underline">
+                    My-O-Mat
+                  </Link>
+                </p>
+              ) : null}
               <Button variant="outline" onClick={resetFlow}>
                 <RotateCcw />
                 Neu starten
