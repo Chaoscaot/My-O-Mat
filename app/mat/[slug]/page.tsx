@@ -17,11 +17,9 @@ export async function generateMetadata({
   }
 }
 
-export default async function Page({
-  params,
-}: PageProps) {
+export default async function Page({ params }: PageProps) {
   const { slug } = await params
-  const preloaded = await preloadQuery(api.omats.getPublished, { slug })
+  const preloaded = await preloadQuery(api.omatPublic.getPublished, { slug })
 
   return <OmatRunnerPage preload={preloaded} />
 }

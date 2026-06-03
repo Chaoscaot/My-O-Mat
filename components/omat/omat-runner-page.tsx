@@ -8,7 +8,7 @@ import { RunnerPanel } from "./runner-panel"
 export function OmatRunnerPage({
   preload,
 }: {
-  preload: Preloaded<typeof api.omats.getPublished>
+  preload: Preloaded<typeof api.omatPublic.getPublished>
 }) {
   const data = usePreloadedQuery(preload)
 

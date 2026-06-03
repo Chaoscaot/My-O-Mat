@@ -52,10 +52,10 @@ export function AppOverviewPage() {
     [organization, orgId, user?.fullName]
   )
   const ensureActiveOrganization = useMutation(
-    api.omats.ensureActiveOrganization
+    api.workspaces.ensureActiveOrganization
   )
   const dashboard = useQuery(
-    api.omats.listDashboard,
+    api.workspaces.listDashboard,
     isSignedIn && isConvexAuthenticated
       ? { clerkOrganizationId: workspace.clerkOrganizationId }
       : "skip"

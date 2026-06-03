@@ -9,7 +9,7 @@ import { RunnerPanel } from "./runner-panel"
 import { SignInPrompt } from "./sign-in-prompt"
 
 export function HiddenOmatPreviewPage({ omatRef }: { omatRef: string }) {
-  const data = useQuery(api.omats.getHiddenPreview, { ref: omatRef })
+  const data = useQuery(api.omatPublic.getHiddenPreview, { ref: omatRef })
 
   return <PreviewShell data={data} />
 }
@@ -27,7 +27,7 @@ export function OrganizationOmatPreviewPage({
     isLoading: isConvexAuthLoading,
   } = useConvexAuth()
   const data = useQuery(
-    api.omats.getOrganizationPreview,
+    api.omatPublic.getOrganizationPreview,
     isSignedIn && isConvexAuthenticated ? { orgSlug, omatRef } : "skip"
   )
 

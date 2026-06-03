@@ -87,4 +87,40 @@ export default defineSchema({
     .index("by_omatId", ["omatId"])
     .index("by_omatId_and_questionId", ["omatId", "questionId"])
     .index("by_partyId_and_questionId", ["partyId", "questionId"]),
+
+  questionnaires: defineTable({
+    omatId: v.id("omats"),
+    partyId: v.id("parties"),
+    token: v.string(),
+    status: v.union(
+      v.literal("open"),
+      v.literal("submitted"),
+      v.literal("closed")
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    submittedAt: v.optional(v.number()),
+  })
+    .index("by_omatId", ["omatId"])
+    .index("by_partyId", ["partyId"])
+    .index("by_token", ["token"]),
+
+  questionnaireAnswers: defineTable({
+    questionnaireId: v.id("questionnaires"),
+    omatId: v.id("omats"),
+    partyId: v.id("parties"),
+    questionId: v.id("questions"),
+    stance: v.optional(
+      v.union(v.literal("yes"), v.literal("neutral"), v.literal("no"))
+    ),
+    explanation: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_questionnaireId", ["questionnaireId"])
+    .index("by_questionnaireId_and_questionId", [
+      "questionnaireId",
+      "questionId",
+    ])
+    .index("by_omatId", ["omatId"])
+    .index("by_partyId_and_questionId", ["partyId", "questionId"]),
 })
