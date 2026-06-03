@@ -17,6 +17,18 @@ const colorSchemeValidator = v.union(
   v.literal("sunset"),
   v.literal("mono")
 )
+const imprintPersonValidator = v.object({
+  name: v.string(),
+  role: v.string(),
+  street: v.string(),
+  postalCode: v.string(),
+  city: v.string(),
+  country: v.string(),
+  email: v.string(),
+})
+const legalInfoValidator = v.object({
+  imprintPersons: v.array(imprintPersonValidator),
+})
 type OrganizationPlan = "free" | "premium"
 
 async function requireIdentity(ctx: QueryCtx | MutationCtx) {
@@ -183,6 +195,43 @@ function normalizeSlug(value: string) {
   return slugify(value).slice(0, 48)
 }
 
+function normalizeLegalInfo(args: {
+  imprintPersons: {
+    name: string
+    role: string
+    street: string
+    postalCode: string
+    city: string
+    country: string
+    email: string
+  }[]
+}) {
+  return {
+    imprintPersons: args.imprintPersons
+      .map((person) => ({
+        name: person.name.trim(),
+        role: person.role.trim(),
+        street: person.street.trim(),
+        postalCode: person.postalCode.trim(),
+        city: person.city.trim(),
+        country: person.country.trim(),
+        email: person.email.trim(),
+      }))
+      .filter((person) => person.name.length > 0)
+      .slice(0, 10),
+  }
+}
+
+function assertPublishableLegalInfo(legalInfo: {
+  imprintPersons: { name: string }[]
+}) {
+  if (legalInfo.imprintPersons.length === 0) {
+    throw new Error(
+      "Füge mindestens eine Person im O-Mat-Impressum hinzu, bevor du veröffentlichst"
+    )
+  }
+}
+
 async function assertUniqueSlug(
   ctx: QueryCtx | MutationCtx,
   slug: string,
@@ -287,6 +336,9 @@ export const createOmat = mutation({
       description: args.description.trim(),
       colorScheme: "civic",
       watermarksDisabled: false,
+      legalInfo: {
+        imprintPersons: [],
+      },
       isPublished: false,
       createdAt: now,
       updatedAt: now,
@@ -469,7 +521,15 @@ export const updateOmat = mutation({
     isPublished: v.boolean(),
   },
   handler: async (ctx, args) => {
-    await requireOmatAccess(ctx, args.omatId)
+    const { omat } = await requireOmatAccess(ctx, args.omatId)
+    const legalInfo =
+      omat.legalInfo ??
+      normalizeLegalInfo({
+        imprintPersons: [],
+      })
+    if (args.isPublished) {
+      assertPublishableLegalInfo(legalInfo)
+    }
     await ctx.db.patch(args.omatId, {
       title: args.title.trim(),
       description: args.description.trim(),
@@ -487,6 +547,7 @@ export const updateOmatSettings = mutation({
     slug: v.string(),
     colorScheme: colorSchemeValidator,
     watermarksDisabled: v.boolean(),
+    legalInfo: legalInfoValidator,
     isPublished: v.boolean(),
   },
   handler: async (ctx, args) => {
@@ -502,6 +563,10 @@ export const updateOmatSettings = mutation({
     }
     const slug = normalizeSlug(args.slug)
     await assertUniqueSlug(ctx, slug, args.omatId)
+    const legalInfo = normalizeLegalInfo(args.legalInfo)
+    if (args.isPublished) {
+      assertPublishableLegalInfo(legalInfo)
+    }
     if (organization.plan !== plan) {
       await ctx.db.patch(organization._id, { plan })
     }
@@ -511,6 +576,7 @@ export const updateOmatSettings = mutation({
       slug,
       colorScheme: args.colorScheme,
       watermarksDisabled: args.watermarksDisabled && plan === "premium",
+      legalInfo,
       isPublished: args.isPublished,
       updatedAt: Date.now(),
     })

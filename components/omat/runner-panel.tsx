@@ -6,6 +6,9 @@ import {
   BarChart3,
   Check,
   CopyPlus,
+  ExternalLink,
+  FileText,
+  Info,
   ListChecks,
   MessageSquareText,
   Minus,
@@ -15,13 +18,26 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import posthog from "posthog-js"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
 
 import { cn } from "@/lib/utils"
 import { scoreParties } from "./matching"
 import { type AnswerState, type AnswerValue, type RunnerData } from "./types"
 import { EmptyState } from "./empty-state"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 
@@ -90,6 +106,7 @@ function RunnerContent({
   )
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [expandedPartyId, setExpandedPartyId] = useState<string | null>(null)
+  const [legalDialogOpen, setLegalDialogOpen] = useState(false)
   const results = useMemo(
     () => scoreParties(data.parties, data.questions, data.positions, answers),
     [answers, data]
@@ -296,7 +313,7 @@ function RunnerContent({
 
       <div
         className={cn(
-          "omat-runner-brand absolute top-4 left-4 z-10 max-w-[calc(100vw-2rem)] md:top-6 md:left-8 md:max-w-xs",
+          "omat-runner-brand absolute top-4 left-4 z-10 max-w-[calc(100vw-8rem)] md:top-6 md:left-8 md:max-w-xs",
           preview && "md:left-5"
         )}
       >
@@ -304,6 +321,26 @@ function RunnerContent({
           {data.omat.title}
         </h1>
       </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className={cn(
+          "absolute top-4 right-4 z-10 bg-card/90 backdrop-blur md:top-6 md:right-8",
+          preview && "md:right-5"
+        )}
+        onClick={() => setLegalDialogOpen(true)}
+      >
+        <Info />
+        Rechtliches
+      </Button>
+
+      <RunnerLegalDialog
+        data={data}
+        open={legalDialogOpen}
+        onOpenChange={setLegalDialogOpen}
+      />
 
       {stage === "answering" && currentQuestion ? (
         <div
@@ -656,6 +693,112 @@ function RunnerContent({
         </div>
       ) : null}
     </section>
+  )
+}
+
+function RunnerLegalDialog({
+  data,
+  open,
+  onOpenChange,
+}: {
+  data: NonNullable<RunnerData>
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const legalInfo = data.omat.legalInfo
+  const imprintPersons = legalInfo?.imprintPersons ?? []
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Rechtliches</DialogTitle>
+          <DialogDescription>
+            Impressum für diesen O-Mat sowie Links zum Webseiten-Impressum und
+            zur Datenschutzerklärung.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5">
+          <section className="border p-4">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+              <FileText className="size-3.5" />
+              O-Mat-Impressum
+            </div>
+            {imprintPersons.length > 0 ? (
+              <div className="grid gap-3">
+                {imprintPersons.map((person, index) => (
+                  <article
+                    key={`${person.name}-${index}`}
+                    className="border p-4"
+                  >
+                    <h3 className="font-heading text-lg font-semibold">
+                      {person.name}
+                    </h3>
+                    {person.role ? (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {person.role}
+                      </p>
+                    ) : null}
+                    <div className="mt-3 space-y-1 text-sm leading-6">
+                      {person.street ? <p>{person.street}</p> : null}
+                      {person.postalCode || person.city ? (
+                        <p>
+                          {[person.postalCode, person.city]
+                            .filter(Boolean)
+                            .join(" ")}
+                        </p>
+                      ) : null}
+                      {person.country ? <p>{person.country}</p> : null}
+                      {person.email ? (
+                        <a
+                          className="inline-flex font-medium underline underline-offset-4"
+                          href={`mailto:${person.email}`}
+                        >
+                          {person.email}
+                        </a>
+                      ) : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm leading-6 text-muted-foreground">
+                Für diesen O-Mat ist kein Impressum hinterlegt.
+              </p>
+            )}
+          </section>
+
+          <section className="grid gap-2">
+            <LegalDialogLink href="/impressum">
+              Webseiten-Impressum
+            </LegalDialogLink>
+            <LegalDialogLink href="/datenschutz">
+              Datenschutzerklärung
+            </LegalDialogLink>
+          </section>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function LegalDialogLink({
+  href,
+  children,
+}: {
+  href: string
+  children: ReactNode
+}) {
+  return (
+    <Link
+      className="inline-flex items-center justify-between gap-3 border px-4 py-3 text-sm font-medium transition hover:bg-muted"
+      href={href}
+      target="_blank"
+    >
+      {children}
+      <ExternalLink className="size-3.5" />
+    </Link>
   )
 }
 

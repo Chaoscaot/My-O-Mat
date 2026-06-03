@@ -29,6 +29,21 @@ export default defineSchema({
       )
     ),
     watermarksDisabled: v.optional(v.boolean()),
+    legalInfo: v.optional(
+      v.object({
+        imprintPersons: v.array(
+          v.object({
+            name: v.string(),
+            role: v.string(),
+            street: v.string(),
+            postalCode: v.string(),
+            city: v.string(),
+            country: v.string(),
+            email: v.string(),
+          })
+        ),
+      })
+    ),
     isPublished: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),

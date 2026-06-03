@@ -7,6 +7,7 @@ import {
   CircleSlash,
   Copy,
   Eye,
+  ExternalLink,
   FileQuestion,
   GripVertical,
   ImageIcon,
@@ -86,6 +87,18 @@ type PartyFormState = {
   color: string
   logoStorageId?: Id<"_storage">
 }
+type ImprintPersonFormState = {
+  name: string
+  role: string
+  street: string
+  postalCode: string
+  city: string
+  country: string
+  email: string
+}
+type LegalInfoFormState = {
+  imprintPersons: ImprintPersonFormState[]
+}
 
 function isPremiumPlan(value: unknown) {
   return typeof value === "string" && value.toLowerCase() === "premium"
@@ -111,6 +124,16 @@ const colorSchemes: {
   },
   { value: "mono", label: "Mono", swatches: ["#18181b", "#a1a1aa"] },
 ]
+
+const emptyImprintPerson: ImprintPersonFormState = {
+  name: "",
+  role: "",
+  street: "",
+  postalCode: "",
+  city: "",
+  country: "Deutschland",
+  email: "",
+}
 
 const editorTabs: {
   value: EditorTab
@@ -1201,6 +1224,11 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
   const [watermarksDisabled, setWatermarksDisabled] = useState(
     Boolean(editor.omat.watermarksDisabled)
   )
+  const [legalInfo, setLegalInfo] = useState<LegalInfoFormState>({
+    imprintPersons: editor.omat.legalInfo?.imprintPersons.length
+      ? editor.omat.legalInfo.imprintPersons
+      : [],
+  })
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle")
   const [saveError, setSaveError] = useState(
     "Einstellungen konnten nicht gespeichert werden"
@@ -1217,6 +1245,9 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
     (isOrganizationLoaded && isClerkOrganization
       ? currentClerkPlanIsPremium
       : syncedPremiumPlan)
+  const hasImprintPerson = legalInfo.imprintPersons.some((person) =>
+    person.name.trim()
+  )
 
   async function submitSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -1229,6 +1260,7 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
         slug,
         colorScheme,
         watermarksDisabled: hasPremiumPlan && watermarksDisabled,
+        legalInfo,
         isPublished,
       })
       setSaveState("saved")
@@ -1239,6 +1271,36 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
           : "Einstellungen konnten nicht gespeichert werden"
       )
       setSaveState("error")
+    }
+  }
+
+  function addImprintPerson() {
+    setLegalInfo((current) => ({
+      ...current,
+      imprintPersons: [...current.imprintPersons, { ...emptyImprintPerson }],
+    }))
+  }
+
+  function updateImprintPerson(
+    index: number,
+    field: keyof ImprintPersonFormState,
+    value: string
+  ) {
+    setLegalInfo((current) => ({
+      ...current,
+      imprintPersons: current.imprintPersons.map((person, personIndex) =>
+        personIndex === index ? { ...person, [field]: value } : person
+      ),
+    }))
+  }
+
+  function removeImprintPerson(index: number) {
+    const imprintPersons = legalInfo.imprintPersons.filter(
+      (_, personIndex) => personIndex !== index
+    )
+    setLegalInfo((current) => ({ ...current, imprintPersons }))
+    if (!imprintPersons.some((person) => person.name.trim())) {
+      setIsPublished(false)
     }
   }
 
@@ -1388,6 +1450,132 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
             </div>
           </div>
         </div>
+
+        <div className="border p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                O-Mat-Impressum
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Mindestens eine verantwortliche Person ist für die
+                Veröffentlichung erforderlich.
+              </p>
+            </div>
+            <Button type="button" variant="outline" onClick={addImprintPerson}>
+              <Plus />
+              Person hinzufügen
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            {legalInfo.imprintPersons.length === 0 ? (
+              <div className="border border-dashed p-5 text-sm text-muted-foreground">
+                Noch keine Person im O-Mat-Impressum hinterlegt.
+              </div>
+            ) : null}
+            {legalInfo.imprintPersons.map((person, index) => (
+              <article key={index} className="border p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h3 className="font-heading text-lg font-semibold">
+                    Person {index + 1}
+                  </h3>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="destructive"
+                    onClick={() => removeImprintPerson(index)}
+                  >
+                    <Trash2 />
+                    <span className="sr-only">Person entfernen</span>
+                  </Button>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor={`imprint-name-${index}`}>Name</Label>
+                    <Input
+                      id={`imprint-name-${index}`}
+                      value={person.name}
+                      onChange={(event) =>
+                        updateImprintPerson(index, "name", event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor={`imprint-role-${index}`}>Rolle</Label>
+                    <Input
+                      id={`imprint-role-${index}`}
+                      placeholder="z. B. Verantwortlich nach § 18 Abs. 2 MStV"
+                      value={person.role}
+                      onChange={(event) =>
+                        updateImprintPerson(index, "role", event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2 md:col-span-2">
+                    <Label htmlFor={`imprint-street-${index}`}>Straße</Label>
+                    <Input
+                      id={`imprint-street-${index}`}
+                      value={person.street}
+                      onChange={(event) =>
+                        updateImprintPerson(index, "street", event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor={`imprint-postal-${index}`}>PLZ</Label>
+                    <Input
+                      id={`imprint-postal-${index}`}
+                      value={person.postalCode}
+                      onChange={(event) =>
+                        updateImprintPerson(
+                          index,
+                          "postalCode",
+                          event.target.value
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor={`imprint-city-${index}`}>Ort</Label>
+                    <Input
+                      id={`imprint-city-${index}`}
+                      value={person.city}
+                      onChange={(event) =>
+                        updateImprintPerson(index, "city", event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor={`imprint-country-${index}`}>Land</Label>
+                    <Input
+                      id={`imprint-country-${index}`}
+                      value={person.country}
+                      onChange={(event) =>
+                        updateImprintPerson(
+                          index,
+                          "country",
+                          event.target.value
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor={`imprint-email-${index}`}>E-Mail</Label>
+                    <Input
+                      id={`imprint-email-${index}`}
+                      type="email"
+                      value={person.email}
+                      onChange={(event) =>
+                        updateImprintPerson(index, "email", event.target.value)
+                      }
+                    />
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
       </div>
 
       <aside className="space-y-5">
@@ -1401,10 +1589,16 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
                 Öffentlicher Zugriff
               </span>
               <span className="mt-1 block text-xs text-muted-foreground">
-                Ermöglicht das Kopieren und Anzeigen des öffentlichen O-Mats.
+                {hasImprintPerson
+                  ? "Ermöglicht das Kopieren und Anzeigen des öffentlichen O-Mats."
+                  : "Erst nach einer Person im O-Mat-Impressum möglich."}
               </span>
             </span>
-            <Switch checked={isPublished} onCheckedChange={setIsPublished} />
+            <Switch
+              checked={isPublished && hasImprintPerson}
+              disabled={!hasImprintPerson}
+              onCheckedChange={setIsPublished}
+            />
           </label>
         </div>
 
@@ -1428,6 +1622,30 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
               onCheckedChange={setWatermarksDisabled}
             />
           </label>
+        </div>
+
+        <div className="border p-5">
+          <div className="mb-4 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+            Rechtstexte
+          </div>
+          <div className="grid gap-2">
+            <Link
+              className="inline-flex items-center justify-between gap-3 border px-3 py-2 text-sm font-medium hover:bg-muted"
+              href="/impressum"
+              target="_blank"
+            >
+              Webseiten-Impressum
+              <ExternalLink className="size-3.5" />
+            </Link>
+            <Link
+              className="inline-flex items-center justify-between gap-3 border px-3 py-2 text-sm font-medium hover:bg-muted"
+              href="/datenschutz"
+              target="_blank"
+            >
+              Datenschutzerklärung
+              <ExternalLink className="size-3.5" />
+            </Link>
+          </div>
         </div>
 
         <div className="border p-5">
