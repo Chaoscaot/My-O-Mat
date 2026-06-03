@@ -5,7 +5,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server"
-import { type Id } from "./_generated/dataModel"
+import { type Doc, type Id } from "./_generated/dataModel"
 
 const colors = ["#0f766e", "#b91c1c", "#4338ca", "#a16207", "#be185d"]
 const personalWorkspacePrefix = "personal:"
@@ -16,6 +16,11 @@ const colorSchemeValidator = v.union(
   v.literal("forest"),
   v.literal("sunset"),
   v.literal("mono")
+)
+const visibilityValidator = v.union(
+  v.literal("private"),
+  v.literal("hidden"),
+  v.literal("public")
 )
 const imprintPersonValidator = v.object({
   name: v.string(),
@@ -30,6 +35,8 @@ const legalInfoValidator = v.object({
   imprintPersons: v.array(imprintPersonValidator),
 })
 type OrganizationPlan = "free" | "premium"
+type OmatVisibility = "private" | "hidden" | "public"
+type Identity = Awaited<ReturnType<typeof requireIdentity>>
 
 async function requireIdentity(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity()
@@ -37,6 +44,22 @@ async function requireIdentity(ctx: QueryCtx | MutationCtx) {
     throw new Error("Nicht angemeldet")
   }
   return identity
+}
+
+function hasOrganizationAccess(
+  identity: Identity,
+  organization: Doc<"organizations">
+) {
+  if (organization.clerkOrganizationId) {
+    return (
+      getActiveOrganizationClaim(identity) === organization.clerkOrganizationId
+    )
+  }
+  return (
+    organization.ownerTokenIdentifier === identity.tokenIdentifier ||
+    organization.clerkWorkspaceId ===
+      `${personalWorkspacePrefix}${identity.tokenIdentifier}`
+  )
 }
 
 function getActiveOrganizationClaim(
@@ -99,6 +122,7 @@ async function ensureOrganizationForWorkspace(
   ctx: MutationCtx,
   args: {
     clerkOrganizationId: string | null
+    organizationSlug?: string | null
     name: string
     description: string
   }
@@ -114,10 +138,12 @@ async function ensureOrganizationForWorkspace(
   )
   const name = args.name.trim() || "Personal workspace"
   const description = args.description.trim()
+  const slug = normalizeSlug(args.organizationSlug ?? name)
 
   if (existing) {
     await ctx.db.patch(existing._id, {
       name,
+      slug,
       description,
       clerkOrganizationId: workspace.clerkOrganizationId,
       plan,
@@ -128,6 +154,7 @@ async function ensureOrganizationForWorkspace(
 
   const organizationId = await ctx.db.insert("organizations", {
     name,
+    slug,
     description,
     clerkWorkspaceId: workspace.clerkWorkspaceId,
     clerkOrganizationId: workspace.clerkOrganizationId,
@@ -151,19 +178,7 @@ async function requireOrganizationAccess(
   if (!organization) {
     throw new Error("Organisation nicht gefunden")
   }
-  if (organization.clerkOrganizationId) {
-    if (
-      getActiveOrganizationClaim(identity) !== organization.clerkOrganizationId
-    ) {
-      throw new Error("Nicht autorisiert")
-    }
-    return organization
-  }
-  if (
-    organization.ownerTokenIdentifier !== identity.tokenIdentifier &&
-    organization.clerkWorkspaceId !==
-      `${personalWorkspacePrefix}${identity.tokenIdentifier}`
-  ) {
+  if (!hasOrganizationAccess(identity, organization)) {
     throw new Error("Nicht autorisiert")
   }
   return organization
@@ -193,6 +208,13 @@ function slugify(value: string) {
 
 function normalizeSlug(value: string) {
   return slugify(value).slice(0, 48)
+}
+
+function getOmatVisibility(omat: {
+  visibility?: OmatVisibility
+  isPublished: boolean
+}) {
+  return omat.visibility ?? (omat.isPublished ? "public" : "private")
 }
 
 function normalizeLegalInfo(args: {
@@ -244,6 +266,35 @@ async function assertUniqueSlug(
 
   if (existing && existing._id !== currentOmatId) {
     throw new Error("Dieser öffentliche Slug wird bereits verwendet")
+  }
+}
+
+async function getRunnerData(ctx: QueryCtx, omat: Doc<"omats">) {
+  const organization = await ctx.db.get(omat.organizationId)
+  const parties = await ctx.db
+    .query("parties")
+    .withIndex("by_omatId", (q) => q.eq("omatId", omat._id))
+    .collect()
+  const questions = await ctx.db
+    .query("questions")
+    .withIndex("by_omatId_and_order", (q) => q.eq("omatId", omat._id))
+    .collect()
+  const positions = await ctx.db
+    .query("partyPositions")
+    .withIndex("by_omatId", (q) => q.eq("omatId", omat._id))
+    .collect()
+
+  const assets = await withAssetUrls(ctx, omat, parties)
+  return {
+    omat: {
+      ...assets.omat,
+      visibility: getOmatVisibility(omat),
+      watermarksDisabled:
+        assets.omat.watermarksDisabled && organization?.plan === "premium",
+    },
+    parties: assets.parties,
+    questions,
+    positions,
   }
 }
 
@@ -306,6 +357,7 @@ export const listDashboard = query({
 export const ensureActiveOrganization = mutation({
   args: {
     clerkOrganizationId: v.union(v.string(), v.null()),
+    organizationSlug: v.optional(v.union(v.string(), v.null())),
     name: v.string(),
     description: v.string(),
   },
@@ -317,6 +369,7 @@ export const ensureActiveOrganization = mutation({
 export const createOmat = mutation({
   args: {
     clerkOrganizationId: v.union(v.string(), v.null()),
+    organizationSlug: v.optional(v.union(v.string(), v.null())),
     organizationName: v.string(),
     organizationDescription: v.string(),
     title: v.string(),
@@ -325,6 +378,7 @@ export const createOmat = mutation({
   handler: async (ctx, args) => {
     const organization = await ensureOrganizationForWorkspace(ctx, {
       clerkOrganizationId: args.clerkOrganizationId,
+      organizationSlug: args.organizationSlug,
       name: args.organizationName,
       description: args.organizationDescription,
     })
@@ -336,6 +390,7 @@ export const createOmat = mutation({
       description: args.description.trim(),
       colorScheme: "civic",
       watermarksDisabled: false,
+      visibility: "private",
       legalInfo: {
         imprintPersons: [],
       },
@@ -534,6 +589,7 @@ export const updateOmat = mutation({
       title: args.title.trim(),
       description: args.description.trim(),
       isPublished: args.isPublished,
+      visibility: args.isPublished ? "public" : "private",
       updatedAt: Date.now(),
     })
   },
@@ -548,6 +604,7 @@ export const updateOmatSettings = mutation({
     colorScheme: colorSchemeValidator,
     watermarksDisabled: v.boolean(),
     legalInfo: legalInfoValidator,
+    visibility: visibilityValidator,
     isPublished: v.boolean(),
   },
   handler: async (ctx, args) => {
@@ -564,7 +621,7 @@ export const updateOmatSettings = mutation({
     const slug = normalizeSlug(args.slug)
     await assertUniqueSlug(ctx, slug, args.omatId)
     const legalInfo = normalizeLegalInfo(args.legalInfo)
-    if (args.isPublished) {
+    if (args.visibility !== "private") {
       assertPublishableLegalInfo(legalInfo)
     }
     if (organization.plan !== plan) {
@@ -577,7 +634,8 @@ export const updateOmatSettings = mutation({
       colorScheme: args.colorScheme,
       watermarksDisabled: args.watermarksDisabled && plan === "premium",
       legalInfo,
-      isPublished: args.isPublished,
+      visibility: args.visibility,
+      isPublished: args.visibility === "public",
       updatedAt: Date.now(),
     })
   },
@@ -894,30 +952,48 @@ export const getPublished = query({
     if (!omat || !omat.isPublished) {
       return null
     }
-    const organization = await ctx.db.get(omat.organizationId)
-    const parties = await ctx.db
-      .query("parties")
-      .withIndex("by_omatId", (q) => q.eq("omatId", omat._id))
-      .collect()
-    const questions = await ctx.db
-      .query("questions")
-      .withIndex("by_omatId_and_order", (q) => q.eq("omatId", omat._id))
-      .collect()
-    const positions = await ctx.db
-      .query("partyPositions")
-      .withIndex("by_omatId", (q) => q.eq("omatId", omat._id))
-      .collect()
-
-    const assets = await withAssetUrls(ctx, omat, parties)
-    return {
-      omat: {
-        ...assets.omat,
-        watermarksDisabled:
-          assets.omat.watermarksDisabled && organization?.plan === "premium",
-      },
-      parties: assets.parties,
-      questions,
-      positions,
+    if (getOmatVisibility(omat) !== "public") {
+      return null
     }
+    return await getRunnerData(ctx, omat)
+  },
+})
+
+export const getHiddenPreview = query({
+  args: { ref: v.string() },
+  handler: async (ctx, args) => {
+    const omatId = ctx.db.normalizeId("omats", args.ref)
+    const omat = omatId ? await ctx.db.get(omatId) : null
+    if (!omat || getOmatVisibility(omat) !== "hidden") {
+      return null
+    }
+    return await getRunnerData(ctx, omat)
+  },
+})
+
+export const getOrganizationPreview = query({
+  args: { orgSlug: v.string(), omatRef: v.string() },
+  handler: async (ctx, args) => {
+    const omatId = ctx.db.normalizeId("omats", args.omatRef)
+    const omat = omatId ? await ctx.db.get(omatId) : null
+    if (!omat) {
+      return null
+    }
+
+    const identity = await ctx.auth.getUserIdentity()
+    const organization = await ctx.db.get(omat.organizationId)
+    if (
+      !identity ||
+      !organization ||
+      !hasOrganizationAccess(identity, organization)
+    ) {
+      return null
+    }
+    const organizationSlug =
+      organization.slug ?? normalizeSlug(organization.name)
+    if (organizationSlug !== normalizeSlug(args.orgSlug)) {
+      return null
+    }
+    return await getRunnerData(ctx, omat)
   },
 })

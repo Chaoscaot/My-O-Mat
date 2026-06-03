@@ -63,6 +63,7 @@ import { type EditorData, type Stance } from "./types"
 
 type EditorTab = "questions" | "parties" | "answers" | "preview" | "settings"
 type ColorScheme = "civic" | "forest" | "sunset" | "mono"
+type OmatVisibility = "private" | "hidden" | "public"
 type QuestionFormState = {
   title: string
   text: string
@@ -104,6 +105,16 @@ function isPremiumPlan(value: unknown) {
   return typeof value === "string" && value.toLowerCase() === "premium"
 }
 
+function slugifyUrlPart(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "omat"
+  )
+}
+
 const stanceOptions: { value: Stance; label: string }[] = [
   { value: "yes", label: "Ja" },
   { value: "neutral", label: "Neutral" },
@@ -123,6 +134,28 @@ const colorSchemes: {
     swatches: ["#be123c", "#f97316"],
   },
   { value: "mono", label: "Mono", swatches: ["#18181b", "#a1a1aa"] },
+]
+
+const visibilityOptions: {
+  value: OmatVisibility
+  label: string
+  description: string
+}[] = [
+  {
+    value: "private",
+    label: "Privat",
+    description: "Nur Mitglieder der Organisation über /preview/{org}/{id}.",
+  },
+  {
+    value: "hidden",
+    label: "Versteckt",
+    description: "Alle mit Link können ihn über /preview/{id} öffnen.",
+  },
+  {
+    value: "public",
+    label: "Öffentlich",
+    description: "Öffentlich über /mat/{slug}.",
+  },
 ]
 
 const emptyImprintPerson: ImprintPersonFormState = {
@@ -313,11 +346,21 @@ function EditorPanel({ editor }: { editor: EditorData }) {
     )
   }
 
+  const visibility =
+    editor.omat.visibility ?? (editor.omat.isPublished ? "public" : "private")
+  const organizationSlug =
+    editor.organization.slug ?? slugifyUrlPart(editor.organization.name)
+  const privateHref = `/preview/${organizationSlug}/${editor.omat._id}`
+  const hiddenHref = `/preview/${editor.omat._id}`
   const publicHref = `/mat/${editor.omat.slug}`
+  const shareHref =
+    visibility === "public"
+      ? publicHref
+      : visibility === "hidden"
+        ? hiddenHref
+        : privateHref
   const copyPublicLink = async () => {
-    await navigator.clipboard.writeText(
-      `${window.location.origin}${publicHref}`
-    )
+    await navigator.clipboard.writeText(`${window.location.origin}${shareHref}`)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1600)
   }
@@ -338,28 +381,16 @@ function EditorPanel({ editor }: { editor: EditorData }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={copyPublicLink}
-              disabled={!editor.omat.isPublished}
-            >
+            <Button type="button" variant="outline" onClick={copyPublicLink}>
               <Copy />
-              {copied ? "Kopiert" : "Öffentlichen Link kopieren"}
+              {copied ? "Kopiert" : "Link kopieren"}
             </Button>
-            {editor.omat.isPublished ? (
-              <Button asChild>
-                <Link href={publicHref}>
-                  <Eye />
-                  Vorschau
-                </Link>
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" disabled>
-                <BadgeCheck />
+            <Button asChild>
+              <Link href={shareHref}>
+                <Eye />
                 Vorschau
-              </Button>
-            )}
+              </Link>
+            </Button>
           </div>
         </div>
 
@@ -1217,7 +1248,9 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
   const [title, setTitle] = useState(editor.omat.title)
   const [description, setDescription] = useState(editor.omat.description)
   const [slug, setSlug] = useState(editor.omat.slug)
-  const [isPublished, setIsPublished] = useState(editor.omat.isPublished)
+  const [visibility, setVisibility] = useState<OmatVisibility>(
+    editor.omat.visibility ?? (editor.omat.isPublished ? "public" : "private")
+  )
   const [colorScheme, setColorScheme] = useState<ColorScheme>(
     editor.omat.colorScheme ?? "civic"
   )
@@ -1245,6 +1278,9 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
     (isOrganizationLoaded && isClerkOrganization
       ? currentClerkPlanIsPremium
       : syncedPremiumPlan)
+  const selectedVisibility = visibilityOptions.find(
+    (option) => option.value === visibility
+  )
   const hasImprintPerson = legalInfo.imprintPersons.some((person) =>
     person.name.trim()
   )
@@ -1261,7 +1297,8 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
         colorScheme,
         watermarksDisabled: hasPremiumPlan && watermarksDisabled,
         legalInfo,
-        isPublished,
+        visibility,
+        isPublished: visibility === "public",
       })
       setSaveState("saved")
     } catch (error) {
@@ -1300,7 +1337,7 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
     )
     setLegalInfo((current) => ({ ...current, imprintPersons }))
     if (!imprintPersons.some((person) => person.name.trim())) {
-      setIsPublished(false)
+      setVisibility("private")
     }
   }
 
@@ -1583,23 +1620,34 @@ function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
           <div className="mb-4 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
             Veröffentlichung
           </div>
-          <label className="flex items-center justify-between gap-4">
-            <span>
-              <span className="block text-sm font-medium">
-                Öffentlicher Zugriff
-              </span>
-              <span className="mt-1 block text-xs text-muted-foreground">
-                {hasImprintPerson
-                  ? "Ermöglicht das Kopieren und Anzeigen des öffentlichen O-Mats."
-                  : "Erst nach einer Person im O-Mat-Impressum möglich."}
-              </span>
-            </span>
-            <Switch
-              checked={isPublished && hasImprintPerson}
-              disabled={!hasImprintPerson}
-              onCheckedChange={setIsPublished}
-            />
-          </label>
+          <div className="grid gap-2">
+            <Label htmlFor="settings-visibility">Sichtbarkeit</Label>
+            <Select
+              value={visibility}
+              onValueChange={(value) => setVisibility(value as OmatVisibility)}
+            >
+              <SelectTrigger id="settings-visibility" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {visibilityOptions.map((option) => (
+                  <SelectItem
+                    key={option.value}
+                    value={option.value}
+                    disabled={!hasImprintPerson && option.value !== "private"}
+                  >
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {selectedVisibility?.description}
+              {!hasImprintPerson && visibility === "private"
+                ? " Versteckt und öffentlich sind erst nach einer Person im O-Mat-Impressum möglich."
+                : null}
+            </p>
+          </div>
         </div>
 
         <div className="border p-5">

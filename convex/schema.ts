@@ -4,6 +4,7 @@ import { v } from "convex/values"
 export default defineSchema({
   organizations: defineTable({
     name: v.string(),
+    slug: v.optional(v.string()),
     description: v.string(),
     clerkWorkspaceId: v.optional(v.string()),
     clerkOrganizationId: v.optional(v.string()),
@@ -12,7 +13,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_ownerTokenIdentifier", ["ownerTokenIdentifier"])
-    .index("by_clerkWorkspaceId", ["clerkWorkspaceId"]),
+    .index("by_clerkWorkspaceId", ["clerkWorkspaceId"])
+    .index("by_slug", ["slug"]),
 
   omats: defineTable({
     organizationId: v.id("organizations"),
@@ -27,6 +29,9 @@ export default defineSchema({
         v.literal("sunset"),
         v.literal("mono")
       )
+    ),
+    visibility: v.optional(
+      v.union(v.literal("private"), v.literal("hidden"), v.literal("public"))
     ),
     watermarksDisabled: v.optional(v.boolean()),
     legalInfo: v.optional(

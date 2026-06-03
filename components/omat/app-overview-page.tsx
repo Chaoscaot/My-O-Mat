@@ -41,6 +41,7 @@ export function AppOverviewPage() {
   const workspace = useMemo(
     () => ({
       clerkOrganizationId: orgId ?? null,
+      organizationSlug: organization?.slug ?? null,
       name: organization?.name ?? "Personal workspace",
       description: organization
         ? "Clerk-Organisation"
@@ -122,6 +123,7 @@ function DashboardPanel({
   dashboard: DashboardData
   workspace: {
     clerkOrganizationId: string | null
+    organizationSlug: string | null
     name: string
     description: string
   }
@@ -142,6 +144,7 @@ function DashboardPanel({
     try {
       const omatId = await createOmat({
         clerkOrganizationId: workspace.clerkOrganizationId,
+        organizationSlug: workspace.organizationSlug,
         organizationName: workspace.name,
         organizationDescription: workspace.description,
         title,
@@ -211,7 +214,11 @@ function DashboardPanel({
                       {omat.description || "Kein Beschreibungstext"}
                     </span>
                     <span className="mt-4 inline-flex items-center gap-1.5 border px-2 py-1 text-xs font-semibold text-muted-foreground">
-                      {omat.isPublished ? "Veröffentlicht" : "Entwurf"}
+                      {omat.visibility === "hidden"
+                        ? "Versteckt"
+                        : omat.visibility === "public" || omat.isPublished
+                          ? "Öffentlich"
+                          : "Privat"}
                     </span>
                   </span>
                   <ArrowRight className="mt-1 size-4 shrink-0 transition group-hover:translate-x-0.5" />
