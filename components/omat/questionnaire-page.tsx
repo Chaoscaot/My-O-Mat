@@ -12,11 +12,12 @@ import { api } from "@/convex/_generated/api"
 import { type Id } from "@/convex/_generated/dataModel"
 import { cn } from "@/lib/utils"
 import { type Stance } from "./types"
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group"
 
-const stanceOptions: { value: Stance; label: string; text: string }[] = [
-  { value: "yes", label: "Stimme zu", text: "Zustimmung" },
-  { value: "neutral", label: "Neutral", text: "Teils/teils" },
-  { value: "no", label: "Stimme nicht Zu", text: "Ablehnung" },
+const stanceOptions: { value: Stance; text: string }[] = [
+  { value: "yes", text: "Zustimmung" },
+  { value: "neutral", text: "Neutral" },
+  { value: "no", text: "Ablehnung" },
 ]
 
 type QuestionnaireDraft = Record<
@@ -84,7 +85,9 @@ export function QuestionnairePage({ token }: { token: string }) {
         done === questionnaire.questions.length,
     }
   }, [answerByQuestionId, drafts, questionnaire])
-  const isClosed = questionnaire?.questionnaire.status === "closed"
+  const isClosed =
+    questionnaire?.questionnaire.status === "closed" ||
+    questionnaire?.questionnaire.status === "submitted"
 
   function setQuestionDraft(
     questionId: Id<"questions">,
@@ -252,7 +255,7 @@ export function QuestionnairePage({ token }: { token: string }) {
             const draft = getDraft(question._id)
             return (
               <section key={question._id} className="border bg-card p-5">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_23rem]">
                   <div className="min-w-0">
                     <div className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                       These {index + 1}
@@ -269,34 +272,32 @@ export function QuestionnairePage({ token }: { token: string }) {
                   </div>
                   <div className="grid content-start gap-3">
                     <Label>Position</Label>
-                    <div className="grid grid-cols-3 border">
+                    <ToggleGroup
+                      type="single"
+                      size="sm"
+                      variant="outline"
+                      value={draft.stance}
+                      disabled={isClosed}
+                      onValueChange={(value) => {
+                        if (isClosed) return
+                        const nextDraft = {
+                          ...draft,
+                          stance: value as Stance,
+                        }
+                        setQuestionDraft(question._id, nextDraft)
+                        void saveQuestionDraft(question._id, nextDraft)
+                      }}
+                    >
                       {stanceOptions.map((option) => (
-                        <button
+                        <ToggleGroupItem
+                          value={option.value}
                           key={option.value}
-                          type="button"
-                          className={cn(
-                            "grid min-h-14 place-items-center border-r px-2 text-center text-xs font-semibold last:border-r-0 hover:bg-muted",
-                            draft.stance === option.value &&
-                              "bg-foreground text-background hover:bg-foreground"
-                          )}
-                          onClick={() => {
-                            if (isClosed) return
-                            const nextDraft = {
-                              ...draft,
-                              stance: option.value,
-                            }
-                            setQuestionDraft(question._id, nextDraft)
-                            void saveQuestionDraft(question._id, nextDraft)
-                          }}
                           disabled={isClosed}
                         >
-                          <span>{option.label}</span>
-                          <span className="text-[0.65rem] opacity-70">
-                            {option.text}
-                          </span>
-                        </button>
+                          {option.text}
+                        </ToggleGroupItem>
                       ))}
-                    </div>
+                    </ToggleGroup>
                   </div>
                 </div>
                 <div className="mt-4 grid gap-2">
