@@ -3,30 +3,21 @@ import { mutation } from "./_generated/server"
 import {
   colors,
   deleteOmatDocuments,
-  ensureOrganizationForWorkspace,
+  getActiveWorkspace,
   requireOmatAccess,
   slugify,
 } from "./omatShared"
 
 export const createOmat = mutation({
   args: {
-    clerkOrganizationId: v.union(v.string(), v.null()),
-    organizationSlug: v.optional(v.union(v.string(), v.null())),
-    organizationName: v.string(),
-    organizationDescription: v.string(),
     title: v.string(),
     description: v.string(),
   },
   handler: async (ctx, args) => {
-    const organization = await ensureOrganizationForWorkspace(ctx, {
-      clerkOrganizationId: args.clerkOrganizationId,
-      organizationSlug: args.organizationSlug,
-      name: args.organizationName,
-      description: args.organizationDescription,
-    })
+    const workspace = await getActiveWorkspace(ctx)
     const now = Date.now()
     const omatId = await ctx.db.insert("omats", {
-      organizationId: organization._id,
+      organizationId: workspace.id,
       title: args.title.trim(),
       slug: `${slugify(args.title)}-${now.toString(36)}`,
       description: args.description.trim(),

@@ -3,7 +3,6 @@ import { type Doc, type Id } from "./_generated/dataModel"
 import { type MutationCtx, type QueryCtx } from "./_generated/server"
 
 export const colors = ["#0f766e", "#b91c1c", "#4338ca", "#a16207", "#be185d"]
-const personalWorkspacePrefix = "personal:"
 const organizationWorkspacePrefix = "org:"
 
 export const colorSchemeValidator = v.union(
@@ -44,9 +43,18 @@ export const questionnaireDraftAnswerValidator = v.object({
   stance: v.union(stanceValidator, v.null()),
   explanation: v.string(),
 })
+const questionnaireTokenPattern = /^[0-9a-f]{32}$/
+const imageContentTypes = new Set(["image/jpeg", "image/png", "image/webp"])
+const maxImageBytes = 5 * 1024 * 1024
 export type OrganizationPlan = "free" | "premium"
 export type OmatVisibility = "private" | "hidden" | "public"
 type Identity = Awaited<ReturnType<typeof requireIdentity>>
+export type Workspace = {
+  id: string
+  clerkOrganizationId: string
+  slug: string
+  plan: OrganizationPlan
+}
 
 export async function requireIdentity(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity()
@@ -56,20 +64,9 @@ export async function requireIdentity(ctx: QueryCtx | MutationCtx) {
   return identity
 }
 
-export function hasOrganizationAccess(
-  identity: Identity,
-  organization: Doc<"organizations">
-) {
-  if (organization.clerkOrganizationId) {
-    return (
-      getActiveOrganizationClaim(identity) === organization.clerkOrganizationId
-    )
-  }
-  return (
-    organization.ownerTokenIdentifier === identity.tokenIdentifier ||
-    organization.clerkWorkspaceId ===
-      `${personalWorkspacePrefix}${identity.tokenIdentifier}`
-  )
+export function hasWorkspaceAccess(identity: Identity, workspaceId: string) {
+  const activeOrganizationId = getActiveOrganizationClaim(identity)
+  return workspaceId === `${organizationWorkspacePrefix}${activeOrganizationId}`
 }
 
 export function getActiveOrganizationClaim(
@@ -79,13 +76,21 @@ export function getActiveOrganizationClaim(
   return typeof orgId === "string" ? orgId : null
 }
 
+export function getActiveOrganizationSlug(
+  identity: Awaited<ReturnType<typeof requireIdentity>>
+) {
+  const orgSlug = identity.org_slug
+  if (typeof orgSlug !== "string" || !orgSlug.trim()) {
+    throw new Error(
+      "Der Clerk-Organisationsslug fehlt im Convex-JWT. Ergänze im Clerk-JWT-Template convex org_slug mit {{org.slug}}."
+    )
+  }
+  return normalizeSlug(orgSlug)
+}
+
 export function getActiveOrganizationPlan(
   identity: Awaited<ReturnType<typeof requireIdentity>>
 ): OrganizationPlan {
-  if (!getActiveOrganizationClaim(identity)) {
-    return "free"
-  }
-
   const plan = identity.org_plan
   return typeof plan === "string" && plan.toLowerCase() === "premium"
     ? "premium"
@@ -93,105 +98,48 @@ export function getActiveOrganizationPlan(
 }
 
 export function getWorkspaceId(
-  identity: Awaited<ReturnType<typeof requireIdentity>>,
-  clerkOrganizationId: string | null
+  identity: Awaited<ReturnType<typeof requireIdentity>>
 ) {
-  if (!clerkOrganizationId) {
-    return {
-      clerkWorkspaceId: `${personalWorkspacePrefix}${identity.tokenIdentifier}`,
-      clerkOrganizationId: undefined,
-    }
-  }
-
   const activeOrganizationId = getActiveOrganizationClaim(identity)
-  if (activeOrganizationId !== clerkOrganizationId) {
+  if (!activeOrganizationId) {
     throw new Error(
-      "Die aktive Clerk-Organisation fehlt im Convex-JWT. Ergänze im Clerk-JWT-Template convex den Claim org_id mit {{org.id}}."
+      "Die aktive Clerk-Organisation fehlt im Convex-JWT. Ergänze im Clerk-JWT-Template convex org_id mit {{org.id}} und org_slug mit {{org.slug}}."
     )
   }
 
   return {
-    clerkWorkspaceId: `${organizationWorkspacePrefix}${clerkOrganizationId}`,
-    clerkOrganizationId,
+    clerkWorkspaceId: `${organizationWorkspacePrefix}${activeOrganizationId}`,
+    clerkOrganizationId: activeOrganizationId,
   }
 }
 
-export async function getOrganizationByWorkspaceId(
-  ctx: QueryCtx | MutationCtx,
-  clerkWorkspaceId: string
-) {
-  return await ctx.db
-    .query("organizations")
-    .withIndex("by_clerkWorkspaceId", (q) =>
-      q.eq("clerkWorkspaceId", clerkWorkspaceId)
-    )
-    .unique()
-}
+export function getWorkspaceFromIdentity(
+  identity: Awaited<ReturnType<typeof requireIdentity>>
+): Workspace {
+  const workspace = getWorkspaceId(identity)
 
-export async function ensureOrganizationForWorkspace(
-  ctx: MutationCtx,
-  args: {
-    clerkOrganizationId: string | null
-    organizationSlug?: string | null
-    name: string
-    description: string
-  }
-) {
-  const identity = await requireIdentity(ctx)
-  const workspace = getWorkspaceId(identity, args.clerkOrganizationId)
-  const plan = workspace.clerkOrganizationId
-    ? getActiveOrganizationPlan(identity)
-    : "free"
-  const existing = await getOrganizationByWorkspaceId(
-    ctx,
-    workspace.clerkWorkspaceId
-  )
-  const name = args.name.trim() || "Personal workspace"
-  const description = args.description.trim()
-  const slug = normalizeSlug(args.organizationSlug ?? name)
-
-  if (existing) {
-    await ctx.db.patch(existing._id, {
-      name,
-      slug,
-      description,
-      clerkOrganizationId: workspace.clerkOrganizationId,
-      plan,
-      ownerTokenIdentifier: identity.tokenIdentifier,
-    })
-    return existing
-  }
-
-  const organizationId = await ctx.db.insert("organizations", {
-    name,
-    slug,
-    description,
-    clerkWorkspaceId: workspace.clerkWorkspaceId,
+  return {
+    id: workspace.clerkWorkspaceId,
     clerkOrganizationId: workspace.clerkOrganizationId,
-    plan,
-    ownerTokenIdentifier: identity.tokenIdentifier,
-    createdAt: Date.now(),
-  })
-  const organization = await ctx.db.get(organizationId)
-  if (!organization) {
-    throw new Error("Organisation konnte nicht erstellt werden")
+    slug: getActiveOrganizationSlug(identity),
+    plan: getActiveOrganizationPlan(identity),
   }
-  return organization
 }
 
-export async function requireOrganizationAccess(
+export async function getActiveWorkspace(ctx: QueryCtx | MutationCtx) {
+  const identity = await requireIdentity(ctx)
+  return getWorkspaceFromIdentity(identity)
+}
+
+export async function requireWorkspaceAccess(
   ctx: QueryCtx | MutationCtx,
-  organizationId: Id<"organizations">
+  workspaceId: string
 ) {
   const identity = await requireIdentity(ctx)
-  const organization = await ctx.db.get(organizationId)
-  if (!organization) {
-    throw new Error("Organisation nicht gefunden")
-  }
-  if (!hasOrganizationAccess(identity, organization)) {
+  if (!hasWorkspaceAccess(identity, workspaceId)) {
     throw new Error("Nicht autorisiert")
   }
-  return organization
+  return getWorkspaceFromIdentity(identity)
 }
 
 export async function requireOmatAccess(
@@ -202,8 +150,8 @@ export async function requireOmatAccess(
   if (!omat) {
     throw new Error("O-Mat nicht gefunden")
   }
-  const organization = await requireOrganizationAccess(ctx, omat.organizationId)
-  return { omat, organization }
+  const workspace = await requireWorkspaceAccess(ctx, omat.organizationId)
+  return { omat, workspace }
 }
 
 export function slugify(value: string) {
@@ -229,6 +177,30 @@ export function getOmatVisibility(omat: {
 
 function createQuestionnaireToken() {
   return crypto.randomUUID().replace(/-/g, "")
+}
+
+export function normalizeQuestionnaireToken(token: string) {
+  const normalizedToken = token.trim().toLowerCase()
+  if (!questionnaireTokenPattern.test(normalizedToken)) {
+    throw new Error("Fragebogen nicht gefunden")
+  }
+  return normalizedToken
+}
+
+export async function requireImageStorage(
+  ctx: QueryCtx | MutationCtx,
+  storageId: Id<"_storage">
+) {
+  const metadata = await ctx.db.system.get(storageId)
+  if (!metadata) {
+    throw new Error("Datei nicht gefunden")
+  }
+  if (!metadata.contentType || !imageContentTypes.has(metadata.contentType)) {
+    throw new Error("Nur JPEG-, PNG- und WebP-Bilder sind erlaubt")
+  }
+  if (metadata.size > maxImageBytes) {
+    throw new Error("Bilder dürfen höchstens 5 MB groß sein")
+  }
 }
 
 export function normalizeLegalInfo(args: {
@@ -284,7 +256,6 @@ export async function assertUniqueSlug(
 }
 
 export async function getRunnerData(ctx: QueryCtx, omat: Doc<"omats">) {
-  const organization = await ctx.db.get(omat.organizationId)
   const parties = await ctx.db
     .query("parties")
     .withIndex("by_omatId", (q) => q.eq("omatId", omat._id))
@@ -303,8 +274,7 @@ export async function getRunnerData(ctx: QueryCtx, omat: Doc<"omats">) {
     omat: {
       ...assets.omat,
       visibility: getOmatVisibility(omat),
-      watermarksDisabled:
-        assets.omat.watermarksDisabled && organization?.plan === "premium",
+      watermarksDisabled: assets.omat.watermarksDisabled,
     },
     parties: assets.parties,
     questions,
@@ -412,9 +382,10 @@ export async function requireQuestionnaireByToken(
   ctx: MutationCtx,
   token: string
 ) {
+  const normalizedToken = normalizeQuestionnaireToken(token)
   const questionnaire = await ctx.db
     .query("questionnaires")
-    .withIndex("by_token", (q) => q.eq("token", token))
+    .withIndex("by_token", (q) => q.eq("token", normalizedToken))
     .unique()
   if (!questionnaire) {
     throw new Error("Fragebogen nicht gefunden")

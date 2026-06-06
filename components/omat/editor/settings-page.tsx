@@ -44,8 +44,7 @@ import {
 } from "./shared"
 
 export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
-  const { isLoaded: isOrganizationLoaded, organization: clerkOrganization } =
-    useOrganization()
+  const { organization: clerkOrganization } = useOrganization()
   const generateUploadUrl = useMutation(api.uploads.generateUploadUrl)
   const updateSettings = useMutation(api.omatEditor.updateOmatSettings)
   const setOmatBackground = useMutation(api.omatEditor.setOmatBackground)
@@ -71,17 +70,6 @@ export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
     "Einstellungen konnten nicht gespeichert werden"
   )
   const [isUploadingBackground, setIsUploadingBackground] = useState(false)
-  const isClerkOrganization =
-    clerkOrganization?.id === editor.organization.clerkOrganizationId
-  const syncedPremiumPlan = editor.organization.plan === "premium"
-  const currentClerkPlanIsPremium =
-    isClerkOrganization &&
-    isPremiumPlan(clerkOrganization?.publicMetadata?.plan)
-  const hasPremiumPlan =
-    editor.organization.clerkOrganizationId !== undefined &&
-    (isOrganizationLoaded && isClerkOrganization
-      ? currentClerkPlanIsPremium
-      : syncedPremiumPlan)
   const selectedVisibility = visibilityOptions.find(
     (option) => option.value === visibility
   )
@@ -99,7 +87,9 @@ export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
         description,
         slug,
         colorScheme,
-        watermarksDisabled: hasPremiumPlan && watermarksDisabled,
+        watermarksDisabled:
+          (clerkOrganization?.publicMetadata.plan as boolean) &&
+          watermarksDisabled,
         legalInfo,
         visibility,
         isPublished: visibility === "public",
@@ -469,8 +459,11 @@ export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
               </span>
             </span>
             <Switch
-              checked={hasPremiumPlan && watermarksDisabled}
-              disabled={!hasPremiumPlan}
+              checked={
+                (clerkOrganization?.publicMetadata.plan as boolean) &&
+                watermarksDisabled
+              }
+              disabled={!clerkOrganization?.publicMetadata.plan as boolean}
               onCheckedChange={setWatermarksDisabled}
             />
           </label>

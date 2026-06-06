@@ -17,7 +17,7 @@ export default defineSchema({
     .index("by_slug", ["slug"]),
 
   omats: defineTable({
-    organizationId: v.id("organizations"),
+    organizationId: v.union(v.string(), v.id("organizations")),
     title: v.string(),
     slug: v.string(),
     description: v.string(),

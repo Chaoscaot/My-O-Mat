@@ -7,10 +7,7 @@ export type AnswerState = Record<
   { value: AnswerValue; doubled: boolean }
 >
 
-export type DashboardData =
-  | { organization: Doc<"organizations">; omats: Doc<"omats">[] }
-  | null
-  | undefined
+export type DashboardData = { omats: Doc<"omats">[] } | null | undefined
 
 export type RunnerData =
   | {
@@ -22,9 +19,4 @@ export type RunnerData =
   | null
   | undefined
 
-export type EditorData =
-  | ({
-      organization: Doc<"organizations">
-    } & NonNullable<RunnerData>)
-  | null
-  | undefined
+export type EditorData = RunnerData | null | undefined

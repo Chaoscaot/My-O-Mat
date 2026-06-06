@@ -5,6 +5,7 @@ import {
   getOrCreateQuestionnaire,
   questionnaireAnswerValidator,
   questionnaireDraftAnswerValidator,
+  normalizeQuestionnaireToken,
   requireOmatAccess,
   requireQuestionnaireByToken,
   upsertQuestionnaireAnswer,
@@ -124,9 +125,10 @@ export const closeQuestionnaire = mutation({
 export const getQuestionnaireByToken = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {
+    const token = normalizeQuestionnaireToken(args.token)
     const questionnaire = await ctx.db
       .query("questionnaires")
-      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .withIndex("by_token", (q) => q.eq("token", token))
       .unique()
     if (!questionnaire) {
       return null
@@ -134,7 +136,7 @@ export const getQuestionnaireByToken = query({
 
     const omat = await ctx.db.get(questionnaire.omatId)
     const party = await ctx.db.get(questionnaire.partyId)
-    if (!omat || !party) {
+    if (!omat || !party || party.omatId !== questionnaire.omatId) {
       return null
     }
 
@@ -169,6 +171,9 @@ export const saveQuestionnaireDraft = mutation({
     if (questionnaire.status === "closed") {
       throw new Error("Dieser Fragebogen-Link ist geschlossen")
     }
+    if (questionnaire.status === "submitted") {
+      throw new Error("Dieser Fragebogen wurde bereits eingereicht")
+    }
     const now = Date.now()
     await upsertQuestionnaireAnswer(ctx, {
       questionnaireId: questionnaire._id,
@@ -197,6 +202,34 @@ export const submitQuestionnaire = mutation({
     const questionnaire = await requireQuestionnaireByToken(ctx, args.token)
     if (questionnaire.status === "closed") {
       throw new Error("Dieser Fragebogen-Link ist geschlossen")
+    }
+    if (questionnaire.status === "submitted") {
+      throw new Error("Dieser Fragebogen wurde bereits eingereicht")
+    }
+    const questions = await ctx.db
+      .query("questions")
+      .withIndex("by_omatId_and_order", (q) =>
+        q.eq("omatId", questionnaire.omatId)
+      )
+      .collect()
+    if (args.answers.length !== questions.length) {
+      throw new Error("Bitte beantworte alle Thesen vor dem Absenden")
+    }
+    const expectedQuestionIds = new Set(
+      questions.map((question) => question._id)
+    )
+    const seenQuestionIds = new Set<string>()
+    for (const answer of args.answers) {
+      if (
+        !expectedQuestionIds.has(answer.questionId) ||
+        seenQuestionIds.has(answer.questionId)
+      ) {
+        throw new Error("Fragebogen enthält ungültige Antworten")
+      }
+      if (!answer.explanation.trim()) {
+        throw new Error("Bitte begründe jede Position vor dem Absenden")
+      }
+      seenQuestionIds.add(answer.questionId)
     }
     const now = Date.now()
     for (const answer of args.answers) {
