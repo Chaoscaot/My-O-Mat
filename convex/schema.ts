@@ -2,22 +2,8 @@ import { defineSchema, defineTable } from "convex/server"
 import { v } from "convex/values"
 
 export default defineSchema({
-  organizations: defineTable({
-    name: v.string(),
-    slug: v.optional(v.string()),
-    description: v.string(),
-    clerkWorkspaceId: v.optional(v.string()),
-    clerkOrganizationId: v.optional(v.string()),
-    plan: v.optional(v.union(v.literal("free"), v.literal("premium"))),
-    ownerTokenIdentifier: v.string(),
-    createdAt: v.number(),
-  })
-    .index("by_ownerTokenIdentifier", ["ownerTokenIdentifier"])
-    .index("by_clerkWorkspaceId", ["clerkWorkspaceId"])
-    .index("by_slug", ["slug"]),
-
   omats: defineTable({
-    organizationId: v.union(v.string(), v.id("organizations")),
+    organizationId: v.string(),
     title: v.string(),
     slug: v.string(),
     description: v.string(),
