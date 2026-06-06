@@ -39,8 +39,8 @@ export function AppOverviewPage() {
             <h1 className="mt-2 font-heading text-5xl font-semibold">
               {organization?.name}
             </h1>
-            <CreateOmatButton />
           </div>
+          <CreateOmatButton />
         </div>
         {dashboard ? (
           <DashboardPanel dashboard={dashboard} />
@@ -134,52 +134,42 @@ function DashboardPanel({ dashboard }: { dashboard: DashboardData }) {
   return (
     <>
       <div className="flex flex-col gap-4">
-        <div className="border bg-card">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b p-5">
-            <div>
-              <h2 className="mt-1 text-xl font-semibold">
-                {organization?.name}
-              </h2>
-            </div>
+        {dashboard && omats.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              title="Noch keine O-Mats"
+              text="Erstelle den ersten O-Mat für diese Organisation."
+            />
           </div>
-
-          {dashboard && omats.length === 0 ? (
-            <div className="p-5">
-              <EmptyState
-                title="Noch keine O-Mats"
-                text="Erstelle den ersten O-Mat für diese Organisation."
-              />
-            </div>
-          ) : null}
-          {omats.length > 0 ? (
-            <div className="flex flex-col gap-2 p-5">
-              {omats.map((omat) => (
-                <Link
-                  key={omat._id}
-                  className="group flex min-h-28 items-start justify-between gap-4 border bg-background p-4 text-left transition hover:bg-muted"
-                  href={`/app/${omat._id}`}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold">
-                      {omat.title}
-                    </span>
-                    <span className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                      {omat.description || "Kein Beschreibungstext"}
-                    </span>
-                    <span className="mt-4 inline-flex items-center gap-1.5 border px-2 py-1 text-xs font-semibold text-muted-foreground">
-                      {omat.visibility === "hidden"
-                        ? "Versteckt"
-                        : omat.visibility === "public" || omat.isPublished
-                          ? "Öffentlich"
-                          : "Privat"}
-                    </span>
+        ) : null}
+        {omats.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {omats.map((omat) => (
+              <Link
+                key={omat._id}
+                className="group flex min-h-28 items-start justify-between gap-4 border bg-background p-4 text-left transition hover:bg-muted"
+                href={`/app/${omat._id}`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold">
+                    {omat.title}
                   </span>
-                  <ArrowRight className="mt-1 size-4 shrink-0 transition group-hover:translate-x-0.5" />
-                </Link>
-              ))}
-            </div>
-          ) : null}
-        </div>
+                  <span className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                    {omat.description || "Kein Beschreibungstext"}
+                  </span>
+                  <span className="mt-4 inline-flex items-center gap-1.5 border px-2 py-1 text-xs font-semibold text-muted-foreground">
+                    {omat.visibility === "hidden"
+                      ? "Versteckt"
+                      : omat.visibility === "public" || omat.isPublished
+                        ? "Öffentlich"
+                        : "Privat"}
+                  </span>
+                </span>
+                <ArrowRight className="mt-1 size-4 shrink-0 transition group-hover:translate-x-0.5" />
+              </Link>
+            ))}
+          </div>
+        ) : null}
       </div>
     </>
   )

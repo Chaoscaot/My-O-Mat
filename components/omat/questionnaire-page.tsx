@@ -14,9 +14,9 @@ import { cn } from "@/lib/utils"
 import { type Stance } from "./types"
 
 const stanceOptions: { value: Stance; label: string; text: string }[] = [
-  { value: "yes", label: "Ja", text: "Zustimmung" },
+  { value: "yes", label: "Stimme zu", text: "Zustimmung" },
   { value: "neutral", label: "Neutral", text: "Teils/teils" },
-  { value: "no", label: "Nein", text: "Ablehnung" },
+  { value: "no", label: "Stimme nicht Zu", text: "Ablehnung" },
 ]
 
 type QuestionnaireDraft = Record<
