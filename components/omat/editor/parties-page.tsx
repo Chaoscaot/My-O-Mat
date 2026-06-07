@@ -20,7 +20,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/convex/_generated/api"
 import { type Doc, type Id } from "@/convex/_generated/dataModel"
 import { type EditorData } from "../types"
-import { type PartyFormState, uploadFile } from "./shared"
+import {
+  type PartyFormState,
+  optimizePartyLogoFile,
+  uploadFile,
+} from "./shared"
 
 export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
   const generateUploadUrl = useMutation(api.uploads.generateUploadUrl)
@@ -51,7 +55,10 @@ export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
     setIsUploadingLogo(true)
     try {
       const logoStorageId = partyLogoFile
-        ? await uploadFile(generateUploadUrl, partyLogoFile)
+        ? await uploadFile(
+            generateUploadUrl,
+            await optimizePartyLogoFile(partyLogoFile)
+          )
         : partyForm.logoStorageId
 
       if (editingPartyId) {

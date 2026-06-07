@@ -294,17 +294,27 @@ function RunnerContent({
   return (
     <section
       className={cn(
-        "omat-runner-shell relative isolate min-h-svh overflow-hidden bg-cover bg-center px-4 py-24 md:px-8",
+        "omat-runner-shell relative isolate min-h-svh overflow-hidden px-4 py-24 md:px-8",
         preview && "min-h-[38rem] px-3 py-16 md:px-5",
-        data.omat.backgroundUrl &&
-          "before:pointer-events-none before:absolute before:inset-0 before:z-0 before:bg-background/80"
+        data.omat.backgroundUrl && "bg-background"
       )}
-      style={
-        data.omat.backgroundUrl
-          ? { backgroundImage: `url(${data.omat.backgroundUrl})` }
-          : undefined
-      }
     >
+      {data.omat.backgroundUrl ? (
+        <>
+          <Image
+            src={data.omat.backgroundUrl}
+            alt=""
+            fill
+            preload={!preview}
+            sizes="100vw"
+            className="absolute inset-0 z-0 object-cover"
+          />
+          <div
+            className="pointer-events-none absolute inset-0 z-0 bg-background/80"
+            aria-hidden="true"
+          />
+        </>
+      ) : null}
       <div className="omat-runner-streams" aria-hidden="true">
         <span />
         <span />

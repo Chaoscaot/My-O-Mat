@@ -159,6 +159,60 @@ export async function uploadFile(
   return storageId
 }
 
+export async function optimizePartyLogoFile(file: File) {
+  if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+    return file
+  }
+
+  const image = await loadImageFile(file)
+  const maxSize = 512
+  const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
+  const width = Math.max(1, Math.round(image.width * scale))
+  const height = Math.max(1, Math.round(image.height * scale))
+  const canvas = document.createElement("canvas")
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext("2d")
+
+  if (!context) {
+    return file
+  }
+
+  context.imageSmoothingEnabled = true
+  context.imageSmoothingQuality = "high"
+  context.drawImage(image, 0, 0, width, height)
+
+  const optimizedBlob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/webp", 0.82)
+  })
+
+  if (!optimizedBlob || optimizedBlob.size >= file.size) {
+    return file
+  }
+
+  return new File([optimizedBlob], replaceFileExtension(file.name, "webp"), {
+    type: "image/webp",
+    lastModified: Date.now(),
+  })
+}
+
+async function loadImageFile(file: File) {
+  const objectUrl = URL.createObjectURL(file)
+  const image = new window.Image()
+  image.src = objectUrl
+  try {
+    await image.decode()
+    return image
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
+function replaceFileExtension(fileName: string, extension: string) {
+  const baseName = fileName.replace(/\.[^.]+$/, "")
+  return `${baseName}.${extension}`
+}
+
 export function reorderQuestionList(
   questions: QuestionDoc[],
   questionId: Id<"questions">,

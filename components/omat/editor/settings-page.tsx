@@ -249,7 +249,6 @@ export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
                   alt=""
                   width={256}
                   height={144}
-                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : (
