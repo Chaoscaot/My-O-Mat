@@ -19,6 +19,7 @@ export default defineSchema({
     visibility: v.optional(
       v.union(v.literal("private"), v.literal("hidden"), v.literal("public"))
     ),
+    eyeCandyDisabled: v.optional(v.boolean()),
     watermarksDisabled: v.optional(v.boolean()),
     legalInfo: v.optional(
       v.object({

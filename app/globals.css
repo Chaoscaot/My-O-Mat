@@ -159,6 +159,10 @@
     animation: omat-grid-drift 14s linear infinite;
   }
 
+  .omat-runner-shell.is-plain-background::after {
+    content: none;
+  }
+
   .omat-runner-streams {
     position: absolute;
     inset: 0;

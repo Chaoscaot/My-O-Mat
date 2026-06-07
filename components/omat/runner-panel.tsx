@@ -140,6 +140,7 @@ function RunnerContent({
     (question) => answers[question._id]?.value !== "skip"
   )
   const showWatermarks = !data.omat.watermarksDisabled
+  const showEyeCandy = !data.omat.eyeCandyDisabled
   const trackRunnerEvent = useCallback(
     (event: string, properties: Record<string, unknown> = {}) => {
       if (preview) return
@@ -151,6 +152,7 @@ function RunnerContent({
         question_count: data.questions.length,
         party_count: data.parties.length,
         has_background: Boolean(data.omat.backgroundUrl),
+        eye_candy_disabled: Boolean(data.omat.eyeCandyDisabled),
         watermarks_disabled: Boolean(data.omat.watermarksDisabled),
         ...properties,
       })
@@ -159,6 +161,7 @@ function RunnerContent({
       data.omat._id,
       data.omat.backgroundUrl,
       data.omat.colorScheme,
+      data.omat.eyeCandyDisabled,
       data.omat.slug,
       data.omat.watermarksDisabled,
       data.parties.length,
@@ -295,6 +298,7 @@ function RunnerContent({
     <section
       className={cn(
         "omat-runner-shell relative isolate min-h-svh overflow-hidden px-4 py-24 md:px-8",
+        !showEyeCandy && "is-plain-background",
         preview && "min-h-[38rem] px-3 py-16 md:px-5",
         data.omat.backgroundUrl && "bg-background"
       )}
@@ -315,11 +319,13 @@ function RunnerContent({
           />
         </>
       ) : null}
-      <div className="omat-runner-streams" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
+      {showEyeCandy ? (
+        <div className="omat-runner-streams" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+      ) : null}
 
       <div
         className={cn(
@@ -548,14 +554,16 @@ function RunnerContent({
             preview && "min-h-[26rem]"
           )}
         >
-          <div className="omat-confetti" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
+          {showEyeCandy ? (
+            <div className="omat-confetti" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+          ) : null}
           <div className="omat-runner-card w-full border bg-card">
             <div className="border-b p-5">
               <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">

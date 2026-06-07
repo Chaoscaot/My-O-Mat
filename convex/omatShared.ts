@@ -274,6 +274,7 @@ export async function getRunnerData(ctx: QueryCtx, omat: Doc<"omats">) {
     omat: {
       ...assets.omat,
       visibility: getOmatVisibility(omat),
+      eyeCandyDisabled: Boolean(assets.omat.eyeCandyDisabled),
       watermarksDisabled: assets.omat.watermarksDisabled,
     },
     parties: assets.parties,

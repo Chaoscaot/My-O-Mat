@@ -8,6 +8,7 @@ import {
   ImageIcon,
   Palette,
   Plus,
+  Sparkles,
   Trash2,
   Upload,
   X,
@@ -57,6 +58,9 @@ export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
   const [colorScheme, setColorScheme] = useState<ColorScheme>(
     editor.omat.colorScheme ?? "civic"
   )
+  const [eyeCandyDisabled, setEyeCandyDisabled] = useState(
+    Boolean(editor.omat.eyeCandyDisabled)
+  )
   const [watermarksDisabled, setWatermarksDisabled] = useState(
     Boolean(editor.omat.watermarksDisabled)
   )
@@ -90,6 +94,7 @@ export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
         description,
         slug,
         colorScheme,
+        eyeCandyDisabled,
         watermarksDisabled:
           ((clerkOrganization?.publicMetadata.plan ?? false) as boolean) &&
           watermarksDisabled,
@@ -285,6 +290,24 @@ export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
               ) : null}
             </div>
           </div>
+          <label className="mt-4 flex items-center justify-between gap-4 border-t pt-4">
+            <span className="flex items-start gap-3">
+              <Sparkles className="mt-0.5 size-4 text-muted-foreground" />
+              <span>
+                <span className="block text-sm font-medium">
+                  Eye-Candy im Hintergrund entfernen
+                </span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Zeigt im O-Mat nur noch das Hintergrundbild ohne animierte
+                  Grid-, Licht- und Konfetti-Effekte.
+                </span>
+              </span>
+            </span>
+            <Switch
+              checked={eyeCandyDisabled}
+              onCheckedChange={setEyeCandyDisabled}
+            />
+          </label>
         </div>
 
         <div className="border p-5">

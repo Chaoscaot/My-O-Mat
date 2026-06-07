@@ -22,6 +22,7 @@ export const createOmat = mutation({
       slug: `${slugify(args.title)}-${now.toString(36)}`,
       description: args.description.trim(),
       colorScheme: "civic",
+      eyeCandyDisabled: false,
       watermarksDisabled: false,
       visibility: "private",
       legalInfo: {
