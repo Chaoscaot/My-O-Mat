@@ -80,6 +80,9 @@ export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
   async function submitSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSaveState("idle")
+    console.log({
+      plan: clerkOrganization?.publicMetadata.plan,
+    })
     try {
       await updateSettings({
         omatId: editor.omat._id,
@@ -88,7 +91,7 @@ export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
         slug,
         colorScheme,
         watermarksDisabled:
-          (clerkOrganization?.publicMetadata.plan as boolean) &&
+          ((clerkOrganization?.publicMetadata.plan ?? false) as boolean) &&
           watermarksDisabled,
         legalInfo,
         visibility,
