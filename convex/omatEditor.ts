@@ -8,9 +8,10 @@ import {
   legalInfoValidator,
   normalizeLegalInfo,
   normalizeSlug,
+  requireImageStorage,
   requireIdentity,
   requireOmatAccess,
-  requireOrganizationAccess,
+  requireWorkspaceAccess,
   visibilityValidator,
   withAssetUrls,
 } from "./omatShared"
@@ -18,7 +19,7 @@ import {
 export const getEditor = query({
   args: { omatId: v.id("omats") },
   handler: async (ctx, args) => {
-    const { omat, organization } = await requireOmatAccess(ctx, args.omatId)
+    const { omat, workspace } = await requireOmatAccess(ctx, args.omatId)
     const parties = await ctx.db
       .query("parties")
       .withIndex("by_omatId", (q) => q.eq("omatId", args.omatId))
@@ -34,7 +35,7 @@ export const getEditor = query({
 
     const assets = await withAssetUrls(ctx, omat, parties)
     return {
-      organization,
+      workspace,
       omat: assets.omat,
       parties: assets.parties,
       questions,
@@ -60,10 +61,7 @@ export const getEditorByRef = query({
       return null
     }
 
-    const organization = await requireOrganizationAccess(
-      ctx,
-      omat.organizationId
-    )
+    const workspace = await requireWorkspaceAccess(ctx, omat.organizationId)
     const parties = await ctx.db
       .query("parties")
       .withIndex("by_omatId", (q) => q.eq("omatId", omat._id))
@@ -79,7 +77,7 @@ export const getEditorByRef = query({
 
     const assets = await withAssetUrls(ctx, omat, parties)
     return {
-      organization,
+      workspace,
       omat: assets.omat,
       parties: assets.parties,
       questions,
@@ -128,11 +126,9 @@ export const updateOmatSettings = mutation({
     isPublished: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const { organization } = await requireOmatAccess(ctx, args.omatId)
+    await requireOmatAccess(ctx, args.omatId)
     const identity = await requireIdentity(ctx)
-    const plan = organization.clerkOrganizationId
-      ? getActiveOrganizationPlan(identity)
-      : "free"
+    const plan = getActiveOrganizationPlan(identity)
     if (args.watermarksDisabled && plan !== "premium") {
       throw new Error(
         "Wasserzeichen können nur in Premium-Organisationen deaktiviert werden"
@@ -143,9 +139,6 @@ export const updateOmatSettings = mutation({
     const legalInfo = normalizeLegalInfo(args.legalInfo)
     if (args.visibility !== "private") {
       assertPublishableLegalInfo(legalInfo)
-    }
-    if (organization.plan !== plan) {
-      await ctx.db.patch(organization._id, { plan })
     }
     await ctx.db.patch(args.omatId, {
       title: args.title.trim(),
@@ -168,6 +161,9 @@ export const setOmatBackground = mutation({
   },
   handler: async (ctx, args) => {
     const { omat } = await requireOmatAccess(ctx, args.omatId)
+    if (args.storageId) {
+      await requireImageStorage(ctx, args.storageId)
+    }
     await ctx.db.patch(args.omatId, {
       backgroundStorageId: args.storageId ?? undefined,
       updatedAt: Date.now(),

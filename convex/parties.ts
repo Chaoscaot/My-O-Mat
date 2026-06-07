@@ -3,6 +3,7 @@ import { mutation } from "./_generated/server"
 import {
   colors,
   deleteQuestionnaireAnswers,
+  requireImageStorage,
   requireOmatAccess,
 } from "./omatShared"
 
@@ -17,6 +18,9 @@ export const addParty = mutation({
   },
   handler: async (ctx, args) => {
     await requireOmatAccess(ctx, args.omatId)
+    if (args.logoStorageId) {
+      await requireImageStorage(ctx, args.logoStorageId)
+    }
     const parties = await ctx.db
       .query("parties")
       .withIndex("by_omatId", (q) => q.eq("omatId", args.omatId))
@@ -64,6 +68,9 @@ export const updateParty = mutation({
       throw new Error("Partei nicht gefunden")
     }
     await requireOmatAccess(ctx, party.omatId)
+    if (args.logoStorageId) {
+      await requireImageStorage(ctx, args.logoStorageId)
+    }
     await ctx.db.patch(args.partyId, {
       name: args.name.trim(),
       shortName: args.shortName.trim(),
@@ -92,6 +99,9 @@ export const setPartyLogo = mutation({
       throw new Error("Partei nicht gefunden")
     }
     await requireOmatAccess(ctx, party.omatId)
+    if (args.storageId) {
+      await requireImageStorage(ctx, args.storageId)
+    }
     await ctx.db.patch(args.partyId, {
       logoStorageId: args.storageId ?? undefined,
     })

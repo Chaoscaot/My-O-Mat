@@ -1,22 +1,12 @@
 import { v } from "convex/values"
 import { query } from "./_generated/server"
 import {
+  getWorkspaceFromIdentity,
   getOmatVisibility,
   getRunnerData,
-  hasOrganizationAccess,
+  hasWorkspaceAccess,
   normalizeSlug,
 } from "./omatShared"
-
-export const listPublished = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("omats")
-      .withIndex("by_isPublished", (q) => q.eq("isPublished", true))
-      .order("desc")
-      .take(20)
-  },
-})
 
 export const getPublished = query({
   args: { slug: v.string() },
@@ -57,17 +47,11 @@ export const getOrganizationPreview = query({
     }
 
     const identity = await ctx.auth.getUserIdentity()
-    const organization = await ctx.db.get(omat.organizationId)
-    if (
-      !identity ||
-      !organization ||
-      !hasOrganizationAccess(identity, organization)
-    ) {
+    if (!identity || !hasWorkspaceAccess(identity, omat.organizationId)) {
       return null
     }
-    const organizationSlug =
-      organization.slug ?? normalizeSlug(organization.name)
-    if (organizationSlug !== normalizeSlug(args.orgSlug)) {
+    const workspace = getWorkspaceFromIdentity(identity)
+    if (normalizeSlug(workspace.slug) !== normalizeSlug(args.orgSlug)) {
       return null
     }
     return await getRunnerData(ctx, omat)

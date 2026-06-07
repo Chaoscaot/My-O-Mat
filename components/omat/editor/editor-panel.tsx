@@ -14,11 +14,13 @@ import { PartiesPage } from "./parties-page"
 import { QuestionsPage } from "./questions-page"
 import { QuestionnairesPage } from "./questionnaires-page"
 import { SettingsPage } from "./settings-page"
-import { type EditorTab, editorTabs, slugifyUrlPart } from "./shared"
+import { type EditorTab, editorTabs } from "./shared"
+import { useOrganization } from "@clerk/nextjs"
 
 export function EditorPanel({ editor }: { editor: EditorData }) {
   const [activeTab, setActiveTab] = useState<EditorTab>("questions")
   const [copied, setCopied] = useState(false)
+  const { organization } = useOrganization()
 
   if (editor === undefined) {
     return (
@@ -40,9 +42,7 @@ export function EditorPanel({ editor }: { editor: EditorData }) {
 
   const visibility =
     editor.omat.visibility ?? (editor.omat.isPublished ? "public" : "private")
-  const organizationSlug =
-    editor.organization.slug ?? slugifyUrlPart(editor.organization.name)
-  const privateHref = `/preview/${organizationSlug}/${editor.omat._id}`
+  const privateHref = `/preview/${organization?.slug}/${editor.omat._id}`
   const hiddenHref = `/preview/${editor.omat._id}`
   const publicHref = `/mat/${editor.omat.slug}`
   const shareHref =
@@ -63,7 +63,7 @@ export function EditorPanel({ editor }: { editor: EditorData }) {
         <div className="flex flex-wrap items-start justify-between gap-4 border-b p-5">
           <div className="min-w-0">
             <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-              {editor.organization.name}
+              {organization?.name}
             </p>
             <h1 className="mt-2 truncate font-heading text-4xl font-semibold">
               {editor.omat.title}

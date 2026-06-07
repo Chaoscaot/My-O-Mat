@@ -12,6 +12,14 @@ export const setPosition = mutation({
   },
   handler: async (ctx, args) => {
     await requireOmatAccess(ctx, args.omatId)
+    const party = await ctx.db.get(args.partyId)
+    if (!party || party.omatId !== args.omatId) {
+      throw new Error("Partei gehört nicht zu diesem O-Mat")
+    }
+    const question = await ctx.db.get(args.questionId)
+    if (!question || question.omatId !== args.omatId) {
+      throw new Error("These gehört nicht zu diesem O-Mat")
+    }
     return await upsertPartyPosition(ctx, {
       omatId: args.omatId,
       partyId: args.partyId,

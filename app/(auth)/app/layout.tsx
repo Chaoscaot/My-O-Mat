@@ -15,12 +15,6 @@ export default function AuthLayout({
           <div className="flex size-9 items-center justify-center border bg-foreground text-background">
             <Vote className="size-4" />
           </div>
-          <div className="hidden leading-none sm:block">
-            <div className="font-heading text-xl font-semibold">My-O-Mat</div>
-            <div className="text-[0.65rem] font-semibold tracking-widest text-muted-foreground uppercase">
-              Erstelle deinen Wahlhelfer
-            </div>
-          </div>
         </Link>
         <WorkspaceSwitcher />
         <div className="ml-auto flex shrink-0 items-center gap-2">
