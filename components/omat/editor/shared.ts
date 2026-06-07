@@ -196,6 +196,68 @@ export async function optimizePartyLogoFile(file: File) {
   })
 }
 
+export async function optimizeBackgroundImageFile(file: File) {
+  if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+    return file
+  }
+
+  const image = await loadImageFile(file)
+  const targetRatio = 16 / 9
+  const maxWidth = 1920
+  const maxHeight = 1080
+  const sourceWidth = image.naturalWidth || image.width
+  const sourceHeight = image.naturalHeight || image.height
+  const sourceRatio = sourceWidth / sourceHeight
+  const cropWidth =
+    sourceRatio > targetRatio
+      ? Math.round(sourceHeight * targetRatio)
+      : sourceWidth
+  const cropHeight =
+    sourceRatio > targetRatio
+      ? sourceHeight
+      : Math.round(sourceWidth / targetRatio)
+  const cropX = Math.max(0, Math.round((sourceWidth - cropWidth) / 2))
+  const cropY = Math.max(0, Math.round((sourceHeight - cropHeight) / 2))
+  const scale = Math.min(1, maxWidth / cropWidth, maxHeight / cropHeight)
+  const width = Math.max(1, Math.round(cropWidth * scale))
+  const height = Math.max(1, Math.round(cropHeight * scale))
+  const canvas = document.createElement("canvas")
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext("2d")
+
+  if (!context) {
+    return file
+  }
+
+  context.imageSmoothingEnabled = true
+  context.imageSmoothingQuality = "high"
+  context.drawImage(
+    image,
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
+    0,
+    0,
+    width,
+    height
+  )
+
+  const optimizedBlob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/webp", 0.82)
+  })
+
+  if (!optimizedBlob) {
+    return file
+  }
+
+  return new File([optimizedBlob], replaceFileExtension(file.name, "webp"), {
+    type: "image/webp",
+    lastModified: Date.now(),
+  })
+}
+
 async function loadImageFile(file: File) {
   const objectUrl = URL.createObjectURL(file)
   const image = new window.Image()

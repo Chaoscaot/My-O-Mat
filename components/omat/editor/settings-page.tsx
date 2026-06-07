@@ -38,7 +38,7 @@ import {
   type OmatVisibility,
   colorSchemes,
   emptyImprintPerson,
-  isPremiumPlan,
+  optimizeBackgroundImageFile,
   uploadFile,
   visibilityOptions,
 } from "./shared"
@@ -144,7 +144,10 @@ export function SettingsPage({ editor }: { editor: NonNullable<EditorData> }) {
 
     setIsUploadingBackground(true)
     try {
-      const storageId = await uploadFile(generateUploadUrl, file)
+      const storageId = await uploadFile(
+        generateUploadUrl,
+        await optimizeBackgroundImageFile(file)
+      )
       await setOmatBackground({
         omatId: editor.omat._id,
         storageId,

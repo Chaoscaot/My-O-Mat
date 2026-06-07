@@ -152,7 +152,7 @@ export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
                     width={48}
                     height={48}
                     unoptimized
-                    className="size-12 shrink-0 border object-cover"
+                    className="h-12 max-w-20 shrink-0 border object-contain"
                   />
                 ) : (
                   <span className="flex size-12 shrink-0 items-center justify-center border bg-muted">

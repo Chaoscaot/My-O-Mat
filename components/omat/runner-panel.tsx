@@ -593,7 +593,7 @@ function RunnerContent({
                             width={32}
                             height={32}
                             unoptimized
-                            className="size-8 shrink-0 border object-cover"
+                            className="h-8 max-w-14 shrink-0 border object-contain"
                           />
                         ) : (
                           <span
