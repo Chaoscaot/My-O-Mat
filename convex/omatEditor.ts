@@ -8,7 +8,7 @@ import {
   legalInfoValidator,
   normalizeLegalInfo,
   normalizeSlug,
-  requireImageStorage,
+  requireBackgroundImageStorage,
   requireIdentity,
   requireOmatAccess,
   requireWorkspaceAccess,
@@ -163,8 +163,19 @@ export const setOmatBackground = mutation({
   },
   handler: async (ctx, args) => {
     const { omat } = await requireOmatAccess(ctx, args.omatId)
+    const identity = await requireIdentity(ctx)
+    const isPremium = getActiveOrganizationPlan(identity) === "premium"
     if (args.storageId) {
-      await requireImageStorage(ctx, args.storageId)
+      try {
+        await requireBackgroundImageStorage(ctx, args.storageId, {
+          premium: isPremium,
+        })
+      } catch (error) {
+        if (omat.backgroundStorageId !== args.storageId) {
+          await ctx.storage.delete(args.storageId)
+        }
+        throw error
+      }
     }
     await ctx.db.patch(args.omatId, {
       backgroundStorageId: args.storageId ?? undefined,

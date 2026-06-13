@@ -44,8 +44,12 @@ export const questionnaireDraftAnswerValidator = v.object({
   explanation: v.string(),
 })
 const questionnaireTokenPattern = /^[0-9a-f]{32}$/
-const imageContentTypes = new Set(["image/jpeg", "image/png", "image/webp"])
+const imageContentType = "image/webp"
 const maxImageBytes = 5 * 1024 * 1024
+export const maxBackgroundImageBytes = 1024 * 1024
+export const maxBackgroundImageWidth = 1920
+export const maxBackgroundImageHeight = 1080
+export const maxPartyLogoImageBytes = 100 * 1024
 export type OrganizationPlan = "free" | "premium"
 export type OmatVisibility = "private" | "hidden" | "public"
 type Identity = Awaited<ReturnType<typeof requireIdentity>>
@@ -188,19 +192,175 @@ export function normalizeQuestionnaireToken(token: string) {
 }
 
 export async function requireImageStorage(
-  ctx: QueryCtx | MutationCtx,
-  storageId: Id<"_storage">
+  ctx: MutationCtx,
+  storageId: Id<"_storage">,
+  options: {
+    maxBytes?: number | null
+    label?: string
+  } = {}
 ) {
+  const label = options.label ?? "Bilder"
   const metadata = await ctx.db.system.get(storageId)
   if (!metadata) {
     throw new Error("Datei nicht gefunden")
   }
-  if (!metadata.contentType || !imageContentTypes.has(metadata.contentType)) {
-    throw new Error("Nur JPEG-, PNG- und WebP-Bilder sind erlaubt")
+  if (metadata.contentType !== imageContentType) {
+    throw new Error("Nur WebP-Bilder sind erlaubt")
   }
-  if (metadata.size > maxImageBytes) {
-    throw new Error("Bilder dürfen höchstens 5 MB groß sein")
+  const maxBytes =
+    options.maxBytes === undefined ? maxImageBytes : options.maxBytes
+  if (maxBytes !== null && metadata.size > maxBytes) {
+    throw new Error(
+      `${label} dürfen höchstens ${formatBytes(maxBytes)} groß sein`
+    )
   }
+}
+
+export async function requireBackgroundImageStorage(
+  ctx: MutationCtx,
+  storageId: Id<"_storage">,
+  options: { premium: boolean } = { premium: false }
+) {
+  await requireImageStorage(ctx, storageId, {
+    maxBytes: options.premium ? null : maxBackgroundImageBytes,
+    label: "Hintergrundbilder",
+  })
+}
+
+export async function requirePartyLogoStorage(
+  ctx: MutationCtx,
+  storageId: Id<"_storage">
+) {
+  await requireImageStorage(ctx, storageId, {
+    maxBytes: maxPartyLogoImageBytes,
+    label: "Parteilogos",
+  })
+}
+
+export function requireBackgroundImageBytes(
+  contentType: string,
+  bytes: Uint8Array
+) {
+  requireWebpImageBytes(contentType, bytes, "Hintergrundbilder")
+  if (bytes.byteLength > maxBackgroundImageBytes) {
+    throw new Error(
+      `Hintergrundbilder dürfen höchstens ${formatBytes(maxBackgroundImageBytes)} groß sein`
+    )
+  }
+
+  const dimensions = getImageDimensions(contentType, bytes)
+  if (!dimensions) {
+    throw new Error("Bildabmessungen konnten nicht gelesen werden")
+  }
+  if (
+    dimensions.width > maxBackgroundImageWidth ||
+    dimensions.height > maxBackgroundImageHeight
+  ) {
+    throw new Error(
+      `Hintergrundbilder dürfen höchstens ${maxBackgroundImageWidth} x ${maxBackgroundImageHeight} Pixel groß sein`
+    )
+  }
+}
+
+export function requirePremiumBackgroundImageBytes(
+  contentType: string,
+  bytes: Uint8Array
+) {
+  requireWebpImageBytes(contentType, bytes, "Hintergrundbilder")
+}
+
+export function requirePartyLogoBytes(contentType: string, bytes: Uint8Array) {
+  requireWebpImageBytes(contentType, bytes, "Parteilogos")
+  if (bytes.byteLength > maxPartyLogoImageBytes) {
+    throw new Error(
+      `Parteilogos dürfen höchstens ${formatBytes(maxPartyLogoImageBytes)} groß sein`
+    )
+  }
+}
+
+function requireWebpImageBytes(
+  contentType: string,
+  bytes: Uint8Array,
+  label: string
+) {
+  if (contentType !== imageContentType) {
+    throw new Error("Nur WebP-Bilder sind erlaubt")
+  }
+  if (!getWebpDimensions(bytes)) {
+    throw new Error(`${label} müssen gültige WebP-Bilder sein`)
+  }
+}
+
+function formatBytes(bytes: number) {
+  if (bytes % (1024 * 1024) === 0) {
+    return `${bytes / (1024 * 1024)} MB`
+  }
+  if (bytes % 1024 === 0) {
+    return `${bytes / 1024} KB`
+  }
+  return `${bytes} Byte`
+}
+
+function getImageDimensions(contentType: string, bytes: Uint8Array) {
+  if (contentType === "image/webp") {
+    return getWebpDimensions(bytes)
+  }
+  return null
+}
+
+function getWebpDimensions(bytes: Uint8Array) {
+  if (
+    bytes.length < 30 ||
+    readAscii(bytes, 0, 4) !== "RIFF" ||
+    readAscii(bytes, 8, 4) !== "WEBP"
+  ) {
+    return null
+  }
+
+  const format = readAscii(bytes, 12, 4)
+  if (format === "VP8 ") {
+    if (bytes.length < 30) {
+      return null
+    }
+    return {
+      width: readUint16LittleEndian(bytes, 26) & 0x3fff,
+      height: readUint16LittleEndian(bytes, 28) & 0x3fff,
+    }
+  }
+  if (format === "VP8L") {
+    if (bytes.length < 25) {
+      return null
+    }
+    const bits =
+      bytes[21] | (bytes[22] << 8) | (bytes[23] << 16) | (bytes[24] << 24)
+    return {
+      width: (bits & 0x3fff) + 1,
+      height: ((bits >> 14) & 0x3fff) + 1,
+    }
+  }
+  if (format === "VP8X") {
+    if (bytes.length < 30) {
+      return null
+    }
+    return {
+      width: readUint24LittleEndian(bytes, 24) + 1,
+      height: readUint24LittleEndian(bytes, 27) + 1,
+    }
+  }
+
+  return null
+}
+
+function readUint16LittleEndian(bytes: Uint8Array, offset: number) {
+  return bytes[offset] | (bytes[offset + 1] << 8)
+}
+
+function readUint24LittleEndian(bytes: Uint8Array, offset: number) {
+  return bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16)
+}
+
+function readAscii(bytes: Uint8Array, offset: number, length: number) {
+  return String.fromCharCode(...bytes.slice(offset, offset + length))
 }
 
 export function normalizeLegalInfo(args: {

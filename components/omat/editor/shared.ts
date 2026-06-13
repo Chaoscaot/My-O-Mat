@@ -142,21 +142,173 @@ export const editorTabs: {
   { value: "settings", label: "Einstellungen", icon: Settings },
 ]
 
-export async function uploadFile(
-  generateUploadUrl: (args: Record<string, never>) => Promise<string>,
+type UploadKind = "background" | "partyLogo"
+type BackgroundUploadMode = "standard" | "premium4k"
+type GetConvexToken = () => Promise<string | null>
+
+export async function uploadBackgroundFile(
+  getToken: GetConvexToken,
+  file: File,
+  mode: BackgroundUploadMode = "standard"
+) {
+  return await uploadWebpImageFile(getToken, file, "background", {
+    mode,
+    maxBytes: mode === "premium4k" ? null : 1024 * 1024,
+    maxWidth: mode === "premium4k" ? null : 1920,
+    maxHeight: mode === "premium4k" ? null : 1080,
+  })
+}
+
+export async function uploadPartyLogoFile(
+  getToken: GetConvexToken,
   file: File
 ) {
-  const uploadUrl = await generateUploadUrl({})
-  const result = await fetch(uploadUrl, {
-    method: "POST",
-    headers: { "Content-Type": file.type },
-    body: file,
+  return await uploadWebpImageFile(getToken, file, "partyLogo", {
+    mode: "standard",
+    maxBytes: 100 * 1024,
+    maxWidth: 512,
+    maxHeight: 512,
   })
-  if (!result.ok) {
-    throw new Error("Upload fehlgeschlagen")
+}
+
+async function uploadWebpImageFile(
+  getToken: GetConvexToken,
+  file: File,
+  kind: UploadKind,
+  compression: {
+    mode: BackgroundUploadMode
+    maxBytes: number | null
+    maxWidth: number | null
+    maxHeight: number | null
   }
-  const { storageId } = (await result.json()) as { storageId: Id<"_storage"> }
-  return storageId
+) {
+  const uploadUrl = process.env.NEXT_PUBLIC_CONVEX_SITE_URL
+  if (!uploadUrl) {
+    throw new Error("Upload-Endpunkt ist nicht konfiguriert")
+  }
+
+  const token = await getToken()
+  if (!token) {
+    throw new Error("Nicht angemeldet")
+  }
+
+  const webp = await compressImageToWebp(file, compression)
+  const imageUploadUrl = new URL(`${uploadUrl}/upload/image`)
+  imageUploadUrl.searchParams.set("kind", kind)
+  if (kind === "background") {
+    imageUploadUrl.searchParams.set("mode", compression.mode)
+  }
+
+  const result = await fetch(imageUploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "image/webp",
+    },
+    body: webp,
+  })
+  const body = (await result.json()) as {
+    storageId?: Id<"_storage">
+    error?: string
+  }
+  if (!result.ok || !body.storageId) {
+    throw new Error(body.error ?? "Upload fehlgeschlagen")
+  }
+  return body.storageId
+}
+
+async function compressImageToWebp(
+  file: File,
+  options: {
+    maxBytes: number | null
+    maxWidth: number | null
+    maxHeight: number | null
+  }
+) {
+  const { image, release } = await loadImage(file)
+  try {
+    const scale = Math.min(
+      1,
+      options.maxWidth ? options.maxWidth / image.naturalWidth : 1,
+      options.maxHeight ? options.maxHeight / image.naturalHeight : 1
+    )
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+    const context = canvas.getContext("2d")
+    if (!context) {
+      throw new Error("Bild konnte nicht komprimiert werden")
+    }
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+    if (options.maxBytes === null) {
+      return await canvasToWebpBlob(canvas, 0.9)
+    }
+
+    for (const quality of [0.9, 0.82, 0.74, 0.66, 0.58, 0.5, 0.42]) {
+      const blob = await canvasToWebpBlob(canvas, quality)
+      if (blob.size <= options.maxBytes) {
+        return blob
+      }
+    }
+
+    throw new Error(
+      `Bild konnte nicht unter ${formatFileSize(options.maxBytes)} komprimiert werden`
+    )
+  } finally {
+    release()
+  }
+}
+
+export async function getImageDimensions(file: File) {
+  const { image, release } = await loadImage(file)
+  try {
+    return {
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    }
+  } finally {
+    release()
+  }
+}
+
+async function loadImage(file: File) {
+  const objectUrl = URL.createObjectURL(file)
+  const image = new window.Image()
+  image.decoding = "async"
+  image.src = objectUrl
+  await image.decode()
+  return {
+    image,
+    release: () => URL.revokeObjectURL(objectUrl),
+  }
+}
+
+function canvasToWebpBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("WebP-Komprimierung wird nicht unterstützt"))
+          return
+        }
+        if (blob.type !== "image/webp") {
+          reject(new Error("WebP-Komprimierung wird nicht unterstützt"))
+          return
+        }
+        resolve(blob)
+      },
+      "image/webp",
+      quality
+    )
+  })
+}
+
+function formatFileSize(bytes: number) {
+  return bytes % (1024 * 1024) === 0
+    ? `${bytes / (1024 * 1024)} MB`
+    : `${Math.round(bytes / 1024)} KB`
 }
 
 export async function optimizePartyLogoFile(file: File) {

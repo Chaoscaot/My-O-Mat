@@ -5,6 +5,8 @@ export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
     await requireIdentity(ctx)
-    return await ctx.storage.generateUploadUrl()
+    throw new Error(
+      "Uploads sind nur über die validierten WebP-Endpunkte erlaubt"
+    )
   },
 })

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as http from "../http.js";
 import type * as omatEditor from "../omatEditor.js";
 import type * as omatPublic from "../omatPublic.js";
 import type * as omatShared from "../omatShared.js";
@@ -26,6 +27,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  http: typeof http;
   omatEditor: typeof omatEditor;
   omatPublic: typeof omatPublic;
   omatShared: typeof omatShared;

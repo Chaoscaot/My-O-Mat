@@ -1,5 +1,6 @@
 "use client"
 
+import { useAuth } from "@clerk/nextjs"
 import { FormEvent, useState } from "react"
 import { ImageIcon, Pencil, Plus, Trash2, Upload } from "lucide-react"
 import Image from "next/image"
@@ -20,14 +21,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/convex/_generated/api"
 import { type Doc, type Id } from "@/convex/_generated/dataModel"
 import { type EditorData } from "../types"
-import {
-  type PartyFormState,
-  optimizePartyLogoFile,
-  uploadFile,
-} from "./shared"
+import { type PartyFormState, uploadPartyLogoFile } from "./shared"
 
 export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
-  const generateUploadUrl = useMutation(api.uploads.generateUploadUrl)
+  const { getToken } = useAuth()
   const addParty = useMutation(api.parties.addParty)
   const updateParty = useMutation(api.parties.updateParty)
   const deleteParty = useMutation(api.parties.deleteParty)
@@ -43,6 +40,7 @@ export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
   const [editingPartyId, setEditingPartyId] = useState<Id<"parties"> | null>(
     null
   )
+  const [partyLogoError, setPartyLogoError] = useState<string | null>(null)
 
   const editingParty = editor.parties.find(
     (party) => party._id === editingPartyId
@@ -53,12 +51,10 @@ export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
     if (!partyForm.name.trim()) return
 
     setIsUploadingLogo(true)
+    setPartyLogoError(null)
     try {
       const logoStorageId = partyLogoFile
-        ? await uploadFile(
-            generateUploadUrl,
-            await optimizePartyLogoFile(partyLogoFile)
-          )
+        ? await uploadPartyLogoFile(getToken, partyLogoFile)
         : partyForm.logoStorageId
 
       if (editingPartyId) {
@@ -83,6 +79,12 @@ export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
         })
       }
       resetPartyForm()
+    } catch (error) {
+      setPartyLogoError(
+        error instanceof Error
+          ? error.message
+          : "Parteilogo konnte nicht hochgeladen werden"
+      )
     } finally {
       setIsUploadingLogo(false)
     }
@@ -98,6 +100,7 @@ export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
       logoStorageId: party.logoStorageId,
     })
     setPartyLogoFile(null)
+    setPartyLogoError(null)
     setPartyDialogOpen(true)
   }
 
@@ -110,6 +113,7 @@ export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
       color: "#0f766e",
     })
     setPartyLogoFile(null)
+    setPartyLogoError(null)
     setPartyDialogOpen(true)
   }
 
@@ -122,6 +126,7 @@ export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
       color: "#0f766e",
     })
     setPartyLogoFile(null)
+    setPartyLogoError(null)
     setPartyDialogOpen(false)
   }
 
@@ -302,6 +307,11 @@ export function PartiesPage({ editor }: { editor: NonNullable<EditorData> }) {
                     : "Parteilogo hochladen"}
               </span>
             </label>
+            {partyLogoError ? (
+              <p className="text-xs font-semibold text-destructive">
+                {partyLogoError}
+              </p>
+            ) : null}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={resetPartyForm}>
                 Abbrechen

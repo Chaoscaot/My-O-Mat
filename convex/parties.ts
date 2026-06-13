@@ -3,8 +3,8 @@ import { mutation } from "./_generated/server"
 import {
   colors,
   deleteQuestionnaireAnswers,
-  requireImageStorage,
   requireOmatAccess,
+  requirePartyLogoStorage,
 } from "./omatShared"
 
 export const addParty = mutation({
@@ -19,7 +19,12 @@ export const addParty = mutation({
   handler: async (ctx, args) => {
     await requireOmatAccess(ctx, args.omatId)
     if (args.logoStorageId) {
-      await requireImageStorage(ctx, args.logoStorageId)
+      try {
+        await requirePartyLogoStorage(ctx, args.logoStorageId)
+      } catch (error) {
+        await ctx.storage.delete(args.logoStorageId)
+        throw error
+      }
     }
     const parties = await ctx.db
       .query("parties")
@@ -68,8 +73,13 @@ export const updateParty = mutation({
       throw new Error("Partei nicht gefunden")
     }
     await requireOmatAccess(ctx, party.omatId)
-    if (args.logoStorageId) {
-      await requireImageStorage(ctx, args.logoStorageId)
+    if (args.logoStorageId && args.logoStorageId !== party.logoStorageId) {
+      try {
+        await requirePartyLogoStorage(ctx, args.logoStorageId)
+      } catch (error) {
+        await ctx.storage.delete(args.logoStorageId)
+        throw error
+      }
     }
     await ctx.db.patch(args.partyId, {
       name: args.name.trim(),
@@ -100,7 +110,14 @@ export const setPartyLogo = mutation({
     }
     await requireOmatAccess(ctx, party.omatId)
     if (args.storageId) {
-      await requireImageStorage(ctx, args.storageId)
+      try {
+        await requirePartyLogoStorage(ctx, args.storageId)
+      } catch (error) {
+        if (party.logoStorageId !== args.storageId) {
+          await ctx.storage.delete(args.storageId)
+        }
+        throw error
+      }
     }
     await ctx.db.patch(args.partyId, {
       logoStorageId: args.storageId ?? undefined,
